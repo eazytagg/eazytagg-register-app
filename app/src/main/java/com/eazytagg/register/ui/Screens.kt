@@ -50,13 +50,6 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-// Button wording. These are the defaults; the system's App section will override them.
-private const val L_START = "Register"
-private const val L_SCAN = "Scan my QR code"
-private const val L_CODE = "Enter my PIN"
-private const val L_SUBMIT = "Register"
-private const val L_BACK = "Back"
-private const val L_DONE = "Done"
 
 private fun prettyDate(d: String): String = try {
     val t = d.trim().take(10)
@@ -69,7 +62,13 @@ private fun String.url(base: String) = if (isBlank()) "" else if (startsWith("ht
 fun Root(vm: AppViewModel) {
     val ev = vm.event
     val accent = if (ev == null) DefaultAccent else parseAccent(ev.accent)
+    val u = ev?.ui ?: emptyMap()
+    val style = ButtonStyle(
+        u["btn_color"]?.let { parseAccent(it) }, u["btn_text_color"]?.let { parseAccent(it) },
+        u["btn_radius"]?.toIntOrNull()?.coerceIn(0, 40), u["btn_height"]?.toIntOrNull()?.coerceIn(48, 100)
+    )
     EazyTheme(accent, vm.darkTheme) {
+      CompositionLocalProvider(LocalButtonStyle provides style) {
         Surface(Modifier.fillMaxSize().imePadding(), color = MaterialTheme.colorScheme.background) {
             when (vm.screen) {
                 Screen.Setup -> SetupScreen(vm)
@@ -78,6 +77,7 @@ fun Root(vm: AppViewModel) {
                 else -> Kiosk(vm)
             }
         }
+      }
     }
 }
 
@@ -152,14 +152,14 @@ private fun BrandPanel(vm: AppViewModel, compact: Boolean) {
                 if (!vm.online) Chip("Offline", Warn, WarnInk)
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(ev.title.ifBlank { "Welcome" }, color = textColor, fontWeight = FontWeight.ExtraBold,
+                if (vm.flag("show_title")) Text(ev.title.ifBlank { "Welcome" }, color = textColor, fontWeight = FontWeight.ExtraBold,
                     fontSize = if (compact) 22.sp else 44.sp, lineHeight = if (compact) 26.sp else 48.sp)
                 val sub = listOf(prettyDate(ev.dateText), ev.venue).filter { it.isNotBlank() }.joinToString("  ·  ")
                 if (sub.isNotEmpty()) Text(sub, color = textColor, fontSize = if (compact) 14.sp else 20.sp, fontWeight = FontWeight.SemiBold)
             }
             if (!compact) {
                 Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                    if (vm.screen == Screen.Form) TagPreview(vm)
+                    if (vm.screen == Screen.Form && vm.flag("show_preview")) TagPreview(vm)
                     PoweredBy(vm, onDark = true)
                 }
             }
@@ -198,10 +198,10 @@ private fun TagPreview(vm: AppViewModel) {
 private fun AskDialog(vm: AppViewModel) {
     AlertDialog(
         onDismissRequest = { vm.dismissAsk() },
-        title = { Text("Did you preregister?", fontWeight = FontWeight.ExtraBold, fontSize = 26.sp) },
-        text = { Text("If you did, you can check in with your QR code or your PIN.", fontSize = 18.sp) },
-        confirmButton = { TextButton(onClick = { vm.answerYes() }) { Text("Yes", fontWeight = FontWeight.ExtraBold, fontSize = 22.sp) } },
-        dismissButton = { TextButton(onClick = { vm.answerNo() }) { Text("No", fontWeight = FontWeight.ExtraBold, fontSize = 22.sp) } }
+        title = { Text(vm.t("ask_title", "Did you preregister?"), fontWeight = FontWeight.ExtraBold, fontSize = 26.sp) },
+        text = { Text(vm.t("ask_text", "If you did, you can check in with your QR code or your PIN."), fontSize = 18.sp) },
+        confirmButton = { TextButton(onClick = { vm.answerYes() }) { Text(vm.t("ask_yes", "Yes"), fontWeight = FontWeight.ExtraBold, fontSize = 22.sp) } },
+        dismissButton = { TextButton(onClick = { vm.answerNo() }) { Text(vm.t("ask_no", "No"), fontWeight = FontWeight.ExtraBold, fontSize = 22.sp) } }
     )
 }
 
@@ -210,10 +210,10 @@ private fun WelcomeBody(vm: AppViewModel) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
         Spacer(Modifier.height(1.dp))
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text("Welcome.", fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 52.sp)
-            Text("Register here to get your name tag.", fontSize = 20.sp, color = Muted)
+            Text(vm.t("welcome_title", "Welcome."), fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 52.sp)
+            Text(vm.t("welcome_text", "Register here to get your name tag."), fontSize = 20.sp, color = Muted)
         }
-        BigButton(L_START, { vm.start() }, Modifier.fillMaxWidth(), height = 76)
+        BigButton(vm.t("start_label", "Register"), { vm.start() }, Modifier.fillMaxWidth(), height = 76)
     }
 }
 
@@ -221,13 +221,13 @@ private fun WelcomeBody(vm: AppViewModel) {
 private fun ChooseBody(vm: AppViewModel) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Check in", fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 44.sp)
-            Text("Show your QR code to the camera, or type the 4-digit PIN from your invitation.", fontSize = 19.sp, color = Muted)
+            Text(vm.t("choose_title", "Check in"), fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 44.sp)
+            Text(vm.t("choose_text", "Show your QR code to the camera, or type the 4-digit PIN from your invitation."), fontSize = 19.sp, color = Muted)
         }
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            BigButton(L_SCAN, { vm.chooseScan() }, Modifier.fillMaxWidth(), height = 76)
-            BigButton(L_CODE, { vm.chooseCode() }, Modifier.fillMaxWidth(), primary = false, height = 76)
-            BigButton(L_BACK, { vm.backToWelcome() }, Modifier.fillMaxWidth(), primary = false, height = 56)
+            BigButton(vm.t("scan_label", "Scan my QR code"), { vm.chooseScan() }, Modifier.fillMaxWidth(), height = 76)
+            BigButton(vm.t("code_label", "Enter my PIN"), { vm.chooseCode() }, Modifier.fillMaxWidth(), primary = false, height = 76)
+            if (vm.flag("show_back")) BigButton(vm.t("back_label", "Back"), { vm.backToWelcome() }, Modifier.fillMaxWidth(), primary = false, height = 56)
         }
     }
 }
@@ -235,24 +235,24 @@ private fun ChooseBody(vm: AppViewModel) {
 @Composable
 private fun ScanBody(vm: AppViewModel) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text("Show your QR code", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
+        Text(vm.t("scan_title", "Show your QR code"), fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
         Box(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Color.Black)) {
             CameraScanner(Modifier.fillMaxSize()) { vm.onScanned(it) }
         }
         if (vm.codeMessage.isNotEmpty()) Text(vm.codeMessage, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
-        BigButton(L_BACK, { vm.backToChoose() }, Modifier.fillMaxWidth(), primary = false, height = 56)
+        if (vm.flag("show_back")) BigButton(vm.t("back_label", "Back"), { vm.backToChoose() }, Modifier.fillMaxWidth(), primary = false, height = 56)
     }
 }
 
 @Composable
 private fun CodeBody(vm: AppViewModel, wide: Boolean) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(18.dp)) {
-        Text("Enter your code", fontSize = 36.sp, fontWeight = FontWeight.ExtraBold)
-        Text("The 4 digits on your invitation.", fontSize = 18.sp, color = Muted)
+        Text(vm.t("code_title", "Enter your code"), fontSize = 36.sp, fontWeight = FontWeight.ExtraBold)
+        Text(vm.t("code_text", "The 4 digits on your invitation."), fontSize = 18.sp, color = Muted)
         PinDots(vm.codeDigits.length)
         if (vm.codeMessage.isNotEmpty()) Text(vm.codeMessage, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
         Keypad(vm::codeKey, vm::codeDelete, keyH = if (wide) 72 else 60)
-        BigButton(L_BACK, { vm.backToChoose() }, Modifier.fillMaxWidth(), primary = false, height = 56)
+        if (vm.flag("show_back")) BigButton(vm.t("back_label", "Back"), { vm.backToChoose() }, Modifier.fillMaxWidth(), primary = false, height = 56)
     }
 }
 
@@ -261,8 +261,8 @@ private fun ClosedBody(vm: AppViewModel) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
         Spacer(Modifier.height(1.dp))
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text("Registration has closed.", fontSize = 42.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 46.sp)
-            Text("Please ask at the desk if you need help.", fontSize = 20.sp, color = Muted)
+            Text(vm.t("closed_title", "Registration has closed."), fontSize = 42.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 46.sp)
+            Text(vm.t("closed_text", "Please ask at the desk if you need help."), fontSize = 20.sp, color = Muted)
         }
         Spacer(Modifier.height(1.dp))
     }
@@ -286,7 +286,7 @@ private fun FormBody(vm: AppViewModel) {
     LaunchedEffect(vm.formVersion) { scroll.scrollTo(0) }
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.weight(1f).verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text("Your details", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
+            Text(vm.t("form_title", "Your details"), fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
             key(vm.formVersion) {
                 ev.fields.forEach { f ->
                     if (vm.visible(f)) FieldView(vm, f, Modifier.onGloballyPositioned { tops[f.id] = it.positionInParent().y.toInt() })
@@ -297,8 +297,8 @@ private fun FormBody(vm: AppViewModel) {
         if (vm.formMessage.isNotEmpty())
             Text(vm.formMessage, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(vertical = 8.dp))
         Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            BigButton(L_BACK, { vm.backToWelcome() }, primary = false, enabled = !vm.submitting)
-            BigButton(if (vm.submitting) "Please wait…" else L_SUBMIT, { vm.submit() }, Modifier.weight(1f), enabled = !vm.submitting)
+            if (vm.flag("show_back")) BigButton(vm.t("back_label", "Back"), { vm.backToWelcome() }, primary = false, enabled = !vm.submitting)
+            BigButton(if (vm.submitting) vm.t("wait_label", "Please wait…") else vm.t("submit_label", "Register"), { vm.submit() }, Modifier.weight(1f), enabled = !vm.submitting)
         }
     }
     if (vm.showConsent) ConsentDialog(vm, ev)
@@ -449,9 +449,9 @@ private fun OutcomeBody(vm: AppViewModel) {
             else CheckBadge(64)
             Text(o.title, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 42.sp)
             Text(o.message, fontSize = 20.sp, color = Muted)
-            if (o.pin.isNotBlank()) {
+            if (o.pin.isNotBlank() && vm.flag("show_pin")) {
                 Column(Modifier.clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(horizontal = 24.dp, vertical = 16.dp)) {
-                    Text("Your code", color = Muted, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(vm.t("pin_label", "Your code"), color = Muted, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     Text(o.pin, fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 4.sp)
                 }
             }
@@ -459,10 +459,10 @@ private fun OutcomeBody(vm: AppViewModel) {
                 Text("${vm.queue.size} registration${if (vm.queue.size == 1) "" else "s"} waiting to send", fontWeight = FontWeight.SemiBold, color = Muted)
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
-            BigButton(L_DONE, { vm.resetAll() }, Modifier.weight(1f), height = 72)
+            BigButton(vm.t("done_label", "Done"), { vm.resetAll() }, Modifier.weight(1f), height = 72)
             if (offline) BigButton("Send now", { vm.flushQueue() }, primary = false, height = 72)
         }
-        Text("The form clears for the next person in ${vm.countdown} seconds", color = Muted, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+        Text(vm.t("countdown_text", "The form clears for the next person in {seconds} seconds", "seconds" to vm.countdown.toString()), color = Muted, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp), textAlign = TextAlign.Center)
     }
 }

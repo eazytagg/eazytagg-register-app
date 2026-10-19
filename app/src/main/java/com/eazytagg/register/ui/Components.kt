@@ -28,18 +28,24 @@ import android.graphics.Bitmap
 import android.util.Base64
 import java.io.ByteArrayOutputStream
 
+/** Button look set from the system's App section. */
+data class ButtonStyle(val color: Color? = null, val text: Color? = null, val radius: Int? = null, val height: Int? = null)
+val LocalButtonStyle = compositionLocalOf { ButtonStyle() }
+
 /** Big pill button. Primary uses the event accent. */
 @Composable
 fun BigButton(
     text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
-    primary: Boolean = true, enabled: Boolean = true, height: Int = 68, radius: Int = 34
+    primary: Boolean = true, enabled: Boolean = true, height: Int = 68, radius: Int = -1
 ) {
-    val shape = RoundedCornerShape(radius.dp)
-    val accent = LocalAccent.current
-    val fg = if (primary) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground
+    val st = LocalButtonStyle.current
+    val shape = RoundedCornerShape((if (radius >= 0) radius else (st.radius ?: 34)).dp)
+    val accent = st.color ?: LocalAccent.current
+    val h = if (height >= 68 && st.height != null) st.height else height
+    val fg = if (primary) (st.text ?: MaterialTheme.colorScheme.onPrimary) else MaterialTheme.colorScheme.onBackground
     Box(
         modifier
-            .height(height.dp)
+            .height(h.dp)
             .clip(shape)
             .then(
                 if (primary) Modifier.background(if (enabled) accent else accent.copy(alpha = 0.4f))

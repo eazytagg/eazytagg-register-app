@@ -132,6 +132,15 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         return end.length == 10 && today() > end
     }
 
+    /** Text set in the system's App section, falling back to the built-in wording. */
+    fun t(key: String, default: String, vararg vars: Pair<String, String>): String {
+        var s = event?.ui?.get(key)?.takeIf { it.isNotBlank() } ?: default
+        vars.forEach { (k, x) -> s = s.replace("{$k}", x) }
+        return s.replace("{event}", event?.title ?: "")
+    }
+    fun flag(key: String, default: Boolean = true): Boolean = when (event?.ui?.get(key)) { "no" -> false; "yes" -> true; else -> default }
+    fun uiInt(key: String, default: Int): Int = event?.ui?.get(key)?.toIntOrNull() ?: default
+
     private fun startScreen(): Screen = if (ended(event)) Screen.Closed else Screen.Welcome
 
     private fun clock(): String = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
@@ -236,7 +245,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     /** First screen: "Did you preregister?" pops up. */
     fun start() {
         clearForm()
-        if (askPrereg) askDialog = true else screen = Screen.Form
+        val ask = when (event?.ui?.get("ask_prereg")) { "yes" -> true; "no" -> false; else -> askPrereg }
+        if (ask) askDialog = true else screen = Screen.Form
     }
 
     fun answerNo() { askDialog = false; clearForm(); screen = Screen.Form }
@@ -270,10 +280,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     when {
                         r.status == "success" -> showOutcome(Outcome(
                             Outcome.Kind.CHECKED_IN,
-                            if (name.isBlank()) "You're checked in." else "Welcome, ${name.substringBefore(' ')}.",
-                            if (r.json.optBoolean("printed", false)) "You're checked in. Your tag is printing now. Collect it from the print desk."
-                            else "You're checked in. Enjoy the event.", name))
-                        r.status == "exists" -> showOutcome(Outcome(Outcome.Kind.ALREADY, "You're already checked in.", "You checked in earlier today. Enjoy the event.", name))
+                            if (name.isBlank()) t("msg_plain", "You're checked in.") else t("checkedin_title", "Welcome, {first_name}.", "first_name" to name.substringBefore(' '), "name" to name),
+                            if (r.json.optBoolean("printed", false)) t("msg_printed", "You're checked in. Your tag is printing now. Collect it from the print desk.")
+                            else t("msg_plain", "You're checked in. Enjoy the event."), name))
+                        r.status == "exists" -> showOutcome(Outcome(Outcome.Kind.ALREADY, t("already_title", "You're already checked in."), t("already_message", "You checked in earlier today. Enjoy the event."), name))
                         else -> codeMessage = "We could not find that code. Try again or enter your PIN."
                     }
                 }
@@ -303,12 +313,12 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     when {
                         r.status == "success" -> showOutcome(Outcome(
                             Outcome.Kind.CHECKED_IN,
-                            if (name.isBlank()) "You're checked in." else "Welcome, ${name.substringBefore(' ')}.",
-                            if (r.json.optBoolean("printed", false)) "You're checked in. Your tag is printing now. Collect it from the print desk."
-                            else "You're checked in. Enjoy the event.",
+                            if (name.isBlank()) t("msg_plain", "You're checked in.") else t("checkedin_title", "Welcome, {first_name}.", "first_name" to name.substringBefore(' '), "name" to name),
+                            if (r.json.optBoolean("printed", false)) t("msg_printed", "You're checked in. Your tag is printing now. Collect it from the print desk.")
+                            else t("msg_plain", "You're checked in. Enjoy the event."),
                             name
                         ))
-                        r.status == "exists" -> showOutcome(Outcome(Outcome.Kind.ALREADY, "You're already checked in.", "You checked in earlier today. Enjoy the event.", name))
+                        r.status == "exists" -> showOutcome(Outcome(Outcome.Kind.ALREADY, t("already_title", "You're already checked in."), t("already_message", "You checked in earlier today. Enjoy the event."), name))
                         else -> { codeMessage = "We could not find that code. Check it and try again."; codeDigits = "" }
                     }
                 }
@@ -411,8 +421,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     online = false
                     enqueue(QueuedOp(System.nanoTime(), ev.code, data, consent, testMode, System.currentTimeMillis(), "Register · $who"))
                     showOutcome(Outcome(
-                        Outcome.Kind.SAVED_OFFLINE, "Saved on this device.",
-                        "There is no connection right now. Your registration will be sent automatically when it is back, and your tag prints then.",
+                        Outcome.Kind.SAVED_OFFLINE, t("offline_title", "Saved on this device."),
+                        t("offline_message", "There is no connection right now. Your registration will be sent automatically when it is back, and your tag prints then."),
                         who
                     ))
                 }
@@ -423,9 +433,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                             val name = r.json.optString("display_name").ifBlank { who }
                             showOutcome(Outcome(
                                 Outcome.Kind.REGISTERED,
-                                "You're registered, ${name.substringBefore(' ')}.",
-                                if (r.json.optBoolean("printed", false)) "You're checked in. Your tag is printing now. Collect it from the print desk."
-                                else "You're checked in. Enjoy the event.",
+                                t("registered_title", "You're registered, {first_name}.", "first_name" to name.substringBefore(' '), "name" to name),
+                                if (r.json.optBoolean("printed", false)) t("msg_printed", "You're checked in. Your tag is printing now. Collect it from the print desk.")
+                                else t("msg_plain", "You're checked in. Enjoy the event."),
                                 name, r.json.optString("pin_code")
                             ))
                         }
@@ -442,7 +452,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun showOutcome(o: Outcome) {
         outcome = o
         screen = Screen.Outcome
-        countdown = resetSeconds
+        countdown = uiInt("reset_seconds", resetSeconds)
         countdownJob?.cancel()
         countdownJob = viewModelScope.launch {
             while (countdown > 0) { delay(1_000); countdown-- }

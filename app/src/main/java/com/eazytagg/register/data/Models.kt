@@ -45,13 +45,15 @@ data class EventInfo(
     val bgPath: String = "",
     val consentPopup: Boolean = false,
     val consentText: String = "",
-    val printer: Boolean = false
+    val printer: Boolean = false,
+    val ui: Map<String, String> = emptyMap()
 ) {
     fun toJson(): String = JSONObject().apply {
         put("code", code); put("title", title); put("dateText", dateText); put("venue", venue)
         put("successField", successField); put("endDate", endDate); put("accent", accent)
         put("logoPath", logoPath); put("bgPath", bgPath)
         put("consentPopup", consentPopup); put("consentText", consentText); put("printer", printer)
+        put("ui", JSONObject(ui))
         put("fields", JSONArray().also { arr ->
             fields.forEach { f ->
                 arr.put(JSONObject().apply {
@@ -66,6 +68,12 @@ data class EventInfo(
 
     companion object {
         private fun yes(s: String) = s == "yes" || s == "1" || s == "true"
+        private fun readUi(j: JSONObject?): Map<String, String> {
+            if (j == null) return emptyMap()
+            val out = HashMap<String, String>()
+            j.keys().forEach { k -> val v = j.optString(k, ""); if (v.isNotBlank() && v != "null") out[k] = v }
+            return out
+        }
         private fun clean(s: String) = if (s == "null") "" else s
 
         fun fromJson(s: String): EventInfo? = try {
@@ -86,7 +94,8 @@ data class EventInfo(
                 o.optString("code"), o.optString("title"), o.optString("dateText"), o.optString("venue"),
                 fs, o.optString("successField"), o.optString("endDate"), o.optString("accent"),
                 o.optString("logoPath"), o.optString("bgPath"),
-                o.optBoolean("consentPopup"), o.optString("consentText"), o.optBoolean("printer")
+                o.optBoolean("consentPopup"), o.optString("consentText"), o.optBoolean("printer"),
+                readUi(o.optJSONObject("ui"))
             )
         } catch (e: Exception) { null }
 
@@ -122,7 +131,8 @@ data class EventInfo(
                 bgPath = clean(o.optString("bg")),
                 consentPopup = yes(o.optString("consent_popup")),
                 consentText = clean(o.optString("consent_text")),
-                printer = o.optString("enable_printer") == "yes"
+                printer = o.optString("enable_printer") == "yes",
+                ui = readUi(o.optJSONObject("ui"))
             )
         }
     }
