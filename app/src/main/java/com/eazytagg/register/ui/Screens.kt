@@ -4,6 +4,7 @@ import android.app.DatePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -19,6 +20,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -27,6 +29,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.eazytagg.register.AppViewModel
+import com.eazytagg.register.R
 import com.eazytagg.register.Screen
 import com.eazytagg.register.data.EventInfo
 import com.eazytagg.register.data.Field
@@ -62,6 +65,18 @@ fun Root(vm: AppViewModel) {
     }
 }
 
+/** Fixed EazyTagg mark. Three quick taps open the staff settings. */
+@Composable
+private fun PoweredBy(vm: AppViewModel, onDark: Boolean = false) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = if (onDark) 0.95f else 0f))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { vm.logoTap() }
+            .padding(horizontal = 10.dp, vertical = 6.dp)) {
+        Text("Powered by", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        Image(painterResource(R.drawable.eazytagg_logo), "EazyTagg", Modifier.height(26.dp), contentScale = ContentScale.Fit)
+    }
+}
+
 // ============ layout shell: banner on the left (tablet) / on top (phone) ============
 
 @Composable
@@ -78,6 +93,7 @@ private fun Kiosk(vm: AppViewModel) {
             Column(Modifier.fillMaxSize()) {
                 Box(Modifier.fillMaxWidth()) { BrandPanel(vm, compact = true) }
                 Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = pad, vertical = 18.dp)) { KioskBody(vm, false) }
+                Box(Modifier.fillMaxWidth().padding(bottom = 10.dp), contentAlignment = Alignment.Center) { PoweredBy(vm) }
             }
         }
     }
@@ -113,9 +129,8 @@ private fun BrandPanel(vm: AppViewModel, compact: Boolean) {
             verticalArrangement = if (compact) Arrangement.spacedBy(6.dp) else Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                val tapMod = Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { vm.logoTap() }
-                if (logo.isNotEmpty()) AsyncImage(logo, null, tapMod.height(if (compact) 36.dp else 64.dp).widthIn(max = 220.dp), contentScale = ContentScale.Fit)
-                else Text("EazyTagg", color = textColor, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, modifier = tapMod)
+                if (logo.isNotEmpty()) AsyncImage(logo, null, Modifier.height(if (compact) 36.dp else 64.dp).widthIn(max = 220.dp), contentScale = ContentScale.Fit)
+                else Text("EazyTagg", color = textColor, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
                 if (!vm.online) Chip("Offline", Warn, WarnInk)
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -125,7 +140,10 @@ private fun BrandPanel(vm: AppViewModel, compact: Boolean) {
                 if (sub.isNotEmpty()) Text(sub, color = textColor, fontSize = if (compact) 14.sp else 20.sp, fontWeight = FontWeight.SemiBold)
             }
             if (!compact) {
-                if (vm.screen == Screen.Form) TagPreview(vm) else Spacer(Modifier.height(1.dp))
+                Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
+                    if (vm.screen == Screen.Form) TagPreview(vm)
+                    PoweredBy(vm, onDark = true)
+                }
             }
         }
     }
