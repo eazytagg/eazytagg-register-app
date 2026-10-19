@@ -193,6 +193,17 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ================= staff =================
+    private var tapCount = 0
+    private var lastTapAt = 0L
+
+    /** Tapping the logo three times in a row opens the staff settings. */
+    fun logoTap() {
+        val now = System.currentTimeMillis()
+        tapCount = if (now - lastTapAt <= 800) tapCount + 1 else 1
+        lastTapAt = now
+        if (tapCount >= 3) { tapCount = 0; openStaff() }
+    }
+
     fun openStaff() {
         before = screen
         gatePin = ""; gateError = ""

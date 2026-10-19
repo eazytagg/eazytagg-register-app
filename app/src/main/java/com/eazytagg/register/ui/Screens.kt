@@ -4,6 +4,7 @@ import android.app.DatePickerDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -112,8 +113,9 @@ private fun BrandPanel(vm: AppViewModel, compact: Boolean) {
             verticalArrangement = if (compact) Arrangement.spacedBy(6.dp) else Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                if (logo.isNotEmpty()) AsyncImage(logo, null, Modifier.height(if (compact) 36.dp else 64.dp).widthIn(max = 220.dp), contentScale = ContentScale.Fit)
-                else Text("EazyTagg", color = textColor, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+                val tapMod = Modifier.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { vm.logoTap() }
+                if (logo.isNotEmpty()) AsyncImage(logo, null, tapMod.height(if (compact) 36.dp else 64.dp).widthIn(max = 220.dp), contentScale = ContentScale.Fit)
+                else Text("EazyTagg", color = textColor, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp, modifier = tapMod)
                 if (!vm.online) Chip("Offline", Warn, WarnInk)
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -157,11 +159,6 @@ private fun TagPreview(vm: AppViewModel) {
 // ============ welcome / choose ============
 
 @Composable
-private fun StaffLink(vm: AppViewModel) {
-    TextButton(onClick = { vm.openStaff() }) { Text("Staff", color = Muted) }
-}
-
-@Composable
 private fun AskDialog(vm: AppViewModel) {
     AlertDialog(
         onDismissRequest = { vm.dismissAsk() },
@@ -175,7 +172,7 @@ private fun AskDialog(vm: AppViewModel) {
 @Composable
 private fun WelcomeBody(vm: AppViewModel) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) { StaffLink(vm) }
+        Spacer(Modifier.height(1.dp))
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text("Welcome.", fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 52.sp)
             Text("Register here to get your name tag.", fontSize = 20.sp, color = Muted)
@@ -226,7 +223,7 @@ private fun CodeBody(vm: AppViewModel, wide: Boolean) {
 @Composable
 private fun ClosedBody(vm: AppViewModel) {
     Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) { StaffLink(vm) }
+        Spacer(Modifier.height(1.dp))
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text("Registration has closed.", fontSize = 42.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 46.sp)
             Text("Please ask at the desk if you need help.", fontSize = 20.sp, color = Muted)
