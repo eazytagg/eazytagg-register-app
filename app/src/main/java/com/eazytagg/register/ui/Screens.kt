@@ -414,8 +414,6 @@ private fun SetupScreen(vm: AppViewModel) {
         OutlinedTextField(vm.serverInput, { vm.serverInput = it }, Modifier.fillMaxWidth(), label = { Text("Server address") },
             placeholder = { Text("192.168.0.120/eazytagg_test") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
         OutlinedTextField(vm.codeInput, { vm.codeInput = it }, Modifier.fillMaxWidth(), label = { Text("Event code") }, singleLine = true)
-        if (!vm.staffPinSet) OutlinedTextField(vm.staffPinInput, { vm.staffPinInput = it.filter(Char::isDigit).take(4) }, Modifier.fillMaxWidth(),
-            label = { Text("Staff PIN (4 digits)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
         if (vm.setupMessage.isNotEmpty()) Text(vm.setupMessage, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
         BigButton(if (vm.setupBusy) "Connecting…" else "Save and start", { vm.saveSetup() }, Modifier.fillMaxWidth(), enabled = !vm.setupBusy)
     }
@@ -490,8 +488,6 @@ private fun StaffScreen(vm: AppViewModel) {
         Text("Server and event", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
         OutlinedTextField(vm.serverInput, { vm.serverInput = it }, Modifier.fillMaxWidth(), label = { Text("Server address") }, singleLine = true)
         OutlinedTextField(vm.codeInput, { vm.codeInput = it }, Modifier.fillMaxWidth(), label = { Text("Event code") }, singleLine = true)
-        OutlinedTextField(vm.staffPinInput, { vm.staffPinInput = it.filter(Char::isDigit).take(4) }, Modifier.fillMaxWidth(),
-            label = { Text("New staff PIN (optional)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
         if (vm.setupMessage.isNotEmpty()) Text(vm.setupMessage, color = MaterialTheme.colorScheme.error)
         BigButton(if (vm.setupBusy) "Connecting…" else "Save server settings", { vm.saveSetup() }, enabled = !vm.setupBusy, height = 52, radius = 26)
         Spacer(Modifier.height(30.dp))

@@ -104,6 +104,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
 
     init {
+        store.staffPin = "" // the staff PIN was removed: Staff opens the settings directly
         queue.addAll(store.loadQueue())
         event = EventInfo.fromJson(store.eventJson)
         screen = if (store.baseUrl.isBlank() || store.eventCode.isBlank() || event == null) Screen.Setup else startScreen()
@@ -141,7 +142,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         val code = codeInput.trim()
         if (base.isEmpty()) { setupMessage = "Enter the server address."; return }
         if (code.isEmpty()) { setupMessage = "Enter the event code."; return }
-        if (store.staffPin.isBlank() && staffPinInput.length != 4) { setupMessage = "Choose a 4-digit staff PIN."; return }
         viewModelScope.launch {
             setupBusy = true; setupMessage = ""
             when (val r = Api.getEvent(base, code)) {
@@ -151,8 +151,6 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
                     else {
                         val ev = EventInfo.fromServer(code, r.json)
                         store.baseUrl = base; store.eventCode = code
-                        if (staffPinInput.length == 4) store.staffPin = staffPinInput
-                        staffPinInput = ""
                         serverInput = base
                         event = ev; store.eventJson = ev.toJson()
                         store.lastRefreshed = System.currentTimeMillis(); lastRefreshed = store.lastRefreshed
