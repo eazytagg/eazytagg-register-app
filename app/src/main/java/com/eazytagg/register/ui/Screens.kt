@@ -196,13 +196,28 @@ private fun TagPreview(vm: AppViewModel) {
 
 @Composable
 private fun AskDialog(vm: AppViewModel) {
-    AlertDialog(
+    androidx.compose.ui.window.Dialog(
         onDismissRequest = { vm.dismissAsk() },
-        title = { Text(vm.t("ask_title", "Did you preregister?"), fontWeight = FontWeight.ExtraBold, fontSize = 26.sp) },
-        text = { Text(vm.t("ask_text", "If you did, you can check in with your QR code or your PIN."), fontSize = 18.sp) },
-        confirmButton = { TextButton(onClick = { vm.answerYes() }) { Text(vm.t("ask_yes", "Yes"), fontWeight = FontWeight.ExtraBold, fontSize = 22.sp) } },
-        dismissButton = { TextButton(onClick = { vm.answerNo() }) { Text(vm.t("ask_no", "No"), fontWeight = FontWeight.ExtraBold, fontSize = 22.sp) } }
-    )
+        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        Column(
+            Modifier.padding(24.dp).widthIn(max = 620.dp).fillMaxWidth()
+                .clip(RoundedCornerShape(36.dp)).background(MaterialTheme.colorScheme.surface)
+                .padding(horizontal = 40.dp, vertical = 44.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Text(vm.t("ask_title", "Did you preregister?"), fontSize = 38.sp, lineHeight = 42.sp,
+                fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
+            Text(vm.t("ask_text", "If you did, you can check in with your QR code or your PIN."), fontSize = 20.sp,
+                color = Muted, textAlign = TextAlign.Center, lineHeight = 27.sp)
+            Spacer(Modifier.height(14.dp))
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                BigButton(vm.t("ask_no", "No"), { vm.answerNo() }, Modifier.weight(1f), primary = false, height = 84)
+                BigButton(vm.t("ask_yes", "Yes"), { vm.answerYes() }, Modifier.weight(1f), height = 84)
+            }
+        }
+    }
 }
 
 @Composable
