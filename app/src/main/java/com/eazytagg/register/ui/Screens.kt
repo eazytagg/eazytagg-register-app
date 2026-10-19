@@ -7,6 +7,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -24,6 +26,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
@@ -262,13 +266,26 @@ private fun ClosedBody(vm: AppViewModel) {
 @Composable
 private fun FormBody(vm: AppViewModel) {
     val ev = vm.event ?: return
+    val scroll = rememberScrollState()
+    val tops = remember { mutableStateMapOf<String, Int>() }
+    // after a failed Register tap, jump to the first field that needs attention
+    LaunchedEffect(vm.formMessage, vm.errors.size) {
+        if (vm.errors.isNotEmpty()) {
+            val y = vm.errors.keys.mapNotNull { tops[it] }.minOrNull()
+            if (y != null) scroll.animateScrollTo((y - 24).coerceAtLeast(0))
+        }
+    }
+    // new person: back to the top
+    LaunchedEffect(vm.formVersion) { scroll.scrollTo(0) }
     Column(Modifier.fillMaxSize()) {
-        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        Column(Modifier.weight(1f).verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text("Your details", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
             key(vm.formVersion) {
-                ev.fields.forEach { f -> if (vm.visible(f)) FieldView(vm, f) }
+                ev.fields.forEach { f ->
+                    if (vm.visible(f)) FieldView(vm, f, Modifier.onGloballyPositioned { tops[f.id] = it.positionInParent().y.toInt() })
+                }
             }
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(120.dp)) // room to scroll the last field above the keyboard
         }
         if (vm.formMessage.isNotEmpty())
             Text(vm.formMessage, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(vertical = 8.dp))
@@ -296,15 +313,16 @@ private fun FieldLabel(f: Field) {
     Text(f.name + if (f.required) " *" else "", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun FieldView(vm: AppViewModel, f: Field) {
+private fun FieldView(vm: AppViewModel, f: Field, modifier: Modifier = Modifier) {
     if (f.unsupported) return
     if (f.isStatic) {
-        Text(f.name, fontSize = 16.sp, color = Muted, textAlign = if (f.type == "text_center") TextAlign.Center else if (f.type == "text_right") TextAlign.End else TextAlign.Start, modifier = Modifier.fillMaxWidth())
+        Text(f.name, fontSize = 16.sp, color = Muted, textAlign = if (f.type == "text_center") TextAlign.Center else if (f.type == "text_right") TextAlign.End else TextAlign.Start, modifier = modifier.fillMaxWidth())
         return
     }
     val err = vm.errors[f.id]
-    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
         FieldLabel(f)
         when {
             f.isSignature -> SignaturePad({ vm.setSignature(f.id, it) })
@@ -324,7 +342,7 @@ private fun FieldView(vm: AppViewModel, f: Field) {
                     }
                 }
             }
-            f.isRadio -> Row(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            f.isRadio -> FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 f.options.forEach { o ->
                     val sel = vm.values[f.id] == o
                     Box(
