@@ -1,333 +1,499 @@
 package com.eazytagg.register.ui
 
-import androidx.compose.foundation.BorderStroke
+import android.app.DatePickerDialog
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import coil.compose.AsyncImage
 import com.eazytagg.register.AppViewModel
 import com.eazytagg.register.Screen
+import com.eazytagg.register.data.EventInfo
 import com.eazytagg.register.data.Field
+import com.eazytagg.register.data.Outcome
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
+
+// Button wording. These are the defaults; the system's App section will override them.
+private const val L_START = "Register"
+private const val L_SCAN = "Scan my QR code"
+private const val L_CODE = "Enter my PIN"
+private const val L_SUBMIT = "Register"
+private const val L_BACK = "Back"
+private const val L_DONE = "Done"
+
+private fun String.url(base: String) = if (isBlank()) "" else if (startsWith("http")) this else base + "uploads/" + this
 
 @Composable
 fun Root(vm: AppViewModel) {
+    val ev = vm.event
+    val accent = if (ev == null) DefaultAccent else parseAccent(ev.accent)
+    EazyTheme(accent, vm.darkTheme) {
+        Surface(Modifier.fillMaxSize().imePadding(), color = MaterialTheme.colorScheme.background) {
+            when (vm.screen) {
+                Screen.Setup -> SetupScreen(vm)
+                Screen.StaffGate -> GateScreen(vm)
+                Screen.Staff -> StaffScreen(vm)
+                else -> Kiosk(vm)
+            }
+        }
+    }
+}
+
+// ============ layout shell: banner on the left (tablet) / on top (phone) ============
+
+@Composable
+private fun Kiosk(vm: AppViewModel) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val wide = maxWidth >= 720.dp
+        val pad = if (wide) 64.dp else 22.dp
+        if (wide) {
+            Row(Modifier.fillMaxSize()) {
+                Box(Modifier.weight(0.42f).fillMaxHeight()) { BrandPanel(vm, compact = false) }
+                Box(Modifier.weight(0.58f).fillMaxHeight().padding(horizontal = pad, vertical = 40.dp)) { KioskBody(vm, true) }
+            }
+        } else {
+            Column(Modifier.fillMaxSize()) {
+                Box(Modifier.fillMaxWidth()) { BrandPanel(vm, compact = true) }
+                Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = pad, vertical = 18.dp)) { KioskBody(vm, false) }
+            }
+        }
+    }
+}
+
+@Composable
+private fun KioskBody(vm: AppViewModel, wide: Boolean) {
     when (vm.screen) {
-        Screen.SignIn -> SignInScreen(vm)
-        Screen.EventCode -> EventCodeScreen(vm)
-        Screen.Dashboard -> DashboardScreen(vm)
-        Screen.Register -> RegisterScreen(vm)
-        Screen.Sync -> SyncScreen(vm)
-        Screen.Activity -> ActivityScreen(vm)
-        Screen.Settings -> SettingsScreen(vm)
-    }
-}
-
-private fun pendingCount(vm: AppViewModel) = vm.queue.count { !it.failed }
-private fun offlineBanner(vm: AppViewModel): String? {
-    val n = pendingCount(vm)
-    return when {
-        !vm.online && n > 0 -> "Offline - $n waiting to sync"
-        !vm.online -> "Offline - actions are saved and sent later"
-        else -> null
-    }
-}
-
-// ---------------------------------------------------------------- sign in
-@Composable
-fun SignInScreen(vm: AppViewModel) {
-    Page(title = "EazyTagg Register", subtitle = "Registration desk sign in") {
-        Spacer(Modifier.height(8.dp))
-        OutlinedTextField(
-            value = vm.serverUrl, onValueChange = { vm.serverUrl = it; vm.clearMsg() },
-            label = { Text("Server address") },
-            placeholder = { Text("e.g. 192.168.1.20/eazytagg") },
-            supportingText = { Text("The address of your EazyTagg server, from the admin.") },
-            singleLine = true, modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri)
-        )
-        OutlinedTextField(
-            value = vm.email, onValueChange = { vm.email = it; vm.clearMsg() },
-            label = { Text("Email") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email)
-        )
-        OutlinedTextField(
-            value = vm.password, onValueChange = { vm.password = it; vm.clearMsg() },
-            label = { Text("Password") }, singleLine = true, modifier = Modifier.fillMaxWidth(),
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password)
-        )
-        MessageText(vm.message, vm.messageIsError)
-        Button(onClick = { vm.signIn() }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth().height(52.dp)) {
-            if (vm.busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-            else Text("Sign in", fontWeight = FontWeight.Bold)
-        }
-        OutlinedButton(onClick = { vm.testConnection() }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth().height(48.dp)) {
-            Text("Test connection")
-        }
-    }
-}
-
-// ---------------------------------------------------------------- event code
-@Composable
-fun EventCodeScreen(vm: AppViewModel) {
-    Page(
-        title = "Event", subtitle = "Signed in as ${vm.agentName}",
-        onBack = if (vm.stack.size > 1) ({ vm.back() }) else null,
-        banner = offlineBanner(vm),
-        actions = { TextButton(onClick = { vm.signOut() }) { Text("Sign out") } }
-    ) {
-        Spacer(Modifier.height(8.dp))
-        Text("Enter the event code", fontSize = 22.sp, fontWeight = FontWeight.Bold)
-        Text("You get the code from the event organizer.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        OutlinedTextField(
-            value = vm.eventCodeInput, onValueChange = { vm.eventCodeInput = it; vm.clearMsg() },
-            label = { Text("Event code") }, singleLine = true, modifier = Modifier.fillMaxWidth()
-        )
-        MessageText(vm.message, vm.messageIsError)
-        Button(onClick = { vm.openEvent() }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth().height(52.dp)) {
-            if (vm.busy) CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
-            else Text("Open event", fontWeight = FontWeight.Bold)
-        }
-    }
-}
-
-// ---------------------------------------------------------------- dashboard
-@Composable
-fun DashboardScreen(vm: AppViewModel) {
-    val ev = vm.event
-    val pending = pendingCount(vm)
-    Page(
-        title = if (ev == null) "Event" else ev.title.ifBlank { "Event ${ev.code}" },
-        subtitle = if (ev == null) null else "Code ${ev.code} · ${vm.agentName}",
-        banner = offlineBanner(vm),
-        actions = { TextButton(onClick = { vm.go(Screen.Settings) }) { Text("Settings") } }
-    ) {
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Registered on this device today", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-                Text("${vm.registeredToday}", fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
-            }
-        }
-        Button(onClick = { vm.startRegister() }, modifier = Modifier.fillMaxWidth().height(64.dp)) {
-            Text("Register new attendee", fontSize = 18.sp, fontWeight = FontWeight.Bold)
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(10.dp), modifier = Modifier.fillMaxWidth()) {
-            OutlinedButton(onClick = { vm.go(Screen.Sync) }, modifier = Modifier.weight(1f).height(48.dp)) {
-                Text(if (pending > 0) "Sync ($pending)" else "Sync")
-            }
-            OutlinedButton(onClick = { vm.go(Screen.Activity) }, modifier = Modifier.weight(1f).height(48.dp)) { Text("Activity") }
-            OutlinedButton(onClick = { vm.changeEvent() }, modifier = Modifier.weight(1f).height(48.dp)) { Text("Event") }
-        }
-        Spacer(Modifier.height(16.dp))
-    }
-}
-
-// ---------------------------------------------------------------- register
-@Composable
-fun RegisterScreen(vm: AppViewModel) {
-    val ev = vm.event
-    Page(title = "Register new attendee", subtitle = "Walk-in", onBack = { vm.back() }, banner = offlineBanner(vm)) {
-        if (ev == null) { Text("No event open."); return@Page }
-        val done = vm.regDone
-        if (done != null) {
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
-                Text(done, modifier = Modifier.padding(20.dp), fontSize = 17.sp, fontWeight = FontWeight.SemiBold)
-            }
-            Button(onClick = { vm.nextRegister() }, modifier = Modifier.fillMaxWidth().height(52.dp)) {
-                Text("Register another", fontWeight = FontWeight.Bold)
-            }
-            OutlinedButton(onClick = { vm.back() }, modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("Done") }
-            return@Page
-        }
-        ev.fields.filter { it.editable }.forEach { f -> FieldEditor(vm, f) }
-        if (ev.consentPopup) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { vm.regConsent = !vm.regConsent }) {
-                Checkbox(checked = vm.regConsent, onCheckedChange = { vm.regConsent = it })
-                Text(ev.consentText.ifBlank { "The attendee agrees to the consent notice." }, fontSize = 13.sp)
-            }
-        }
-        MessageText(vm.message, vm.messageIsError)
-        Button(onClick = { vm.saveRegister() }, enabled = !vm.busy, modifier = Modifier.fillMaxWidth().height(52.dp)) {
-            Text("Register & check in", fontWeight = FontWeight.Bold)
-        }
-        Spacer(Modifier.height(16.dp))
+        Screen.Welcome -> { WelcomeBody(vm); if (vm.askDialog) AskDialog(vm) }
+        Screen.Choose -> ChooseBody(vm)
+        Screen.Scan -> ScanBody(vm)
+        Screen.Code -> CodeBody(vm, wide)
+        Screen.Form -> FormBody(vm)
+        Screen.Outcome -> OutcomeBody(vm)
+        Screen.Closed -> ClosedBody(vm)
+        else -> {}
     }
 }
 
 @Composable
-private fun FieldEditor(vm: AppViewModel, f: Field) {
-    val label = f.name + if (f.required) " *" else ""
-    when {
-        f.isMulti -> {
-            Text(label, fontWeight = FontWeight.SemiBold)
-            val chosen = vm.editMulti[f.id].orEmpty()
-            f.options.forEach { opt ->
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable {
-                    vm.editMulti[f.id] = if (opt in chosen) chosen - opt else chosen + opt
-                }) {
-                    Checkbox(checked = opt in chosen, onCheckedChange = { vm.editMulti[f.id] = if (it) chosen + opt else chosen - opt })
-                    Text(opt)
-                }
+private fun BrandPanel(vm: AppViewModel, compact: Boolean) {
+    val ev = vm.event ?: return
+    val accent = LocalAccent.current
+    val onAccent = MaterialTheme.colorScheme.onPrimary
+    val bg = ev.bgPath.url(vm.serverBase)
+    val logo = ev.logoPath.url(vm.serverBase)
+    Box(Modifier.fillMaxSize().background(accent)) {
+        if (bg.isNotEmpty()) AsyncImage(bg, null, Modifier.matchParentSize(), contentScale = ContentScale.Crop)
+        if (bg.isNotEmpty()) Box(Modifier.matchParentSize().background(Color(0x66000000)))
+        val textColor = if (bg.isNotEmpty()) Color.White else onAccent
+        Column(
+            Modifier.fillMaxSize().padding(if (compact) 18.dp else 48.dp),
+            verticalArrangement = if (compact) Arrangement.spacedBy(6.dp) else Arrangement.SpaceBetween
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
+                if (logo.isNotEmpty()) AsyncImage(logo, null, Modifier.height(if (compact) 36.dp else 64.dp).widthIn(max = 220.dp), contentScale = ContentScale.Fit)
+                else Text("EazyTagg", color = textColor, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+                if (!vm.online) Chip("Offline", Warn, WarnInk)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(ev.title.ifBlank { "Welcome" }, color = textColor, fontWeight = FontWeight.ExtraBold,
+                    fontSize = if (compact) 22.sp else 44.sp, lineHeight = if (compact) 26.sp else 48.sp)
+                val sub = listOf(ev.dateText, ev.venue).filter { it.isNotBlank() }.joinToString("  ·  ")
+                if (sub.isNotEmpty()) Text(sub, color = textColor, fontSize = if (compact) 14.sp else 20.sp, fontWeight = FontWeight.SemiBold)
+            }
+            if (!compact) {
+                if (vm.screen == Screen.Form) TagPreview(vm) else Spacer(Modifier.height(1.dp))
             }
         }
-        f.isChoice -> {
-            var open by remember { mutableStateOf(false) }
-            Text(label, fontWeight = FontWeight.SemiBold)
-            Box {
-                OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth().height(52.dp)) {
-                    Text(vm.editValues[f.id].orEmpty().ifBlank { "Choose..." }, modifier = Modifier.weight(1f), textAlign = TextAlign.Start)
-                }
-                DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                    f.options.forEach { opt ->
-                        DropdownMenuItem(text = { Text(opt) }, onClick = { vm.editValues[f.id] = opt; open = false })
+    }
+}
+
+/** Live name tag that fills in while the person types. */
+@Composable
+private fun TagPreview(vm: AppViewModel) {
+    val ev = vm.event ?: return
+    val name = vm.tagName()
+    val line2 = vm.tagLine2()
+    val (done, total) = vm.progress()
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(Color.White).padding(24.dp)) {
+            Text(ev.title, color = Muted, fontSize = 14.sp, fontWeight = FontWeight.Bold, maxLines = 1)
+            Spacer(Modifier.height(14.dp))
+            Text(name.ifBlank { "Your name" }, color = if (name.isBlank()) Color(0xFFB0B4C0) else Ink,
+                fontSize = 34.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 36.sp)
+            Text(line2.ifBlank { " " }, color = Muted, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+        }
+        if (total > 0) {
+            val onC = MaterialTheme.colorScheme.onPrimary
+            Text("$done of $total required fields done", color = onC, fontSize = 15.sp, fontWeight = FontWeight.Bold)
+            Box(Modifier.fillMaxWidth().height(6.dp).clip(CircleShape).background(onC.copy(alpha = 0.25f))) {
+                Box(Modifier.fillMaxWidth(done.toFloat() / total).fillMaxHeight().background(onC))
+            }
+        }
+    }
+}
+
+// ============ welcome / choose ============
+
+@Composable
+private fun StaffLink(vm: AppViewModel) {
+    TextButton(onClick = { vm.openStaff() }) { Text("Staff", color = Muted) }
+}
+
+@Composable
+private fun AskDialog(vm: AppViewModel) {
+    AlertDialog(
+        onDismissRequest = { vm.dismissAsk() },
+        title = { Text("Did you preregister?", fontWeight = FontWeight.ExtraBold, fontSize = 26.sp) },
+        text = { Text("If you did, you can check in with your QR code or your PIN.", fontSize = 18.sp) },
+        confirmButton = { TextButton(onClick = { vm.answerYes() }) { Text("Yes", fontWeight = FontWeight.ExtraBold, fontSize = 22.sp) } },
+        dismissButton = { TextButton(onClick = { vm.answerNo() }) { Text("No", fontWeight = FontWeight.ExtraBold, fontSize = 22.sp) } }
+    )
+}
+
+@Composable
+private fun WelcomeBody(vm: AppViewModel) {
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) { StaffLink(vm) }
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Text("Welcome.", fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 52.sp)
+            Text("Register here to get your name tag.", fontSize = 20.sp, color = Muted)
+        }
+        BigButton(L_START, { vm.start() }, Modifier.fillMaxWidth(), height = 76)
+    }
+}
+
+@Composable
+private fun ChooseBody(vm: AppViewModel) {
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Check in", fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 44.sp)
+            Text("Show your QR code to the camera, or type the 4-digit PIN from your invitation.", fontSize = 19.sp, color = Muted)
+        }
+        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            BigButton(L_SCAN, { vm.chooseScan() }, Modifier.fillMaxWidth(), height = 76)
+            BigButton(L_CODE, { vm.chooseCode() }, Modifier.fillMaxWidth(), primary = false, height = 76)
+            BigButton(L_BACK, { vm.backToWelcome() }, Modifier.fillMaxWidth(), primary = false, height = 56)
+        }
+    }
+}
+
+@Composable
+private fun ScanBody(vm: AppViewModel) {
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text("Show your QR code", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
+        Box(Modifier.weight(1f).fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Color.Black)) {
+            CameraScanner(Modifier.fillMaxSize()) { vm.onScanned(it) }
+        }
+        if (vm.codeMessage.isNotEmpty()) Text(vm.codeMessage, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
+        BigButton(L_BACK, { vm.backToChoose() }, Modifier.fillMaxWidth(), primary = false, height = 56)
+    }
+}
+
+@Composable
+private fun CodeBody(vm: AppViewModel, wide: Boolean) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(18.dp)) {
+        Text("Enter your code", fontSize = 36.sp, fontWeight = FontWeight.ExtraBold)
+        Text("The 4 digits on your invitation.", fontSize = 18.sp, color = Muted)
+        PinDots(vm.codeDigits.length)
+        if (vm.codeMessage.isNotEmpty()) Text(vm.codeMessage, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
+        Keypad(vm::codeKey, vm::codeDelete, keyH = if (wide) 72 else 60)
+        BigButton(L_BACK, { vm.backToChoose() }, Modifier.fillMaxWidth(), primary = false, height = 56)
+    }
+}
+
+@Composable
+private fun ClosedBody(vm: AppViewModel) {
+    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
+        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.CenterEnd) { StaffLink(vm) }
+        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text("Registration has closed.", fontSize = 42.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 46.sp)
+            Text("Please ask at the desk if you need help.", fontSize = 20.sp, color = Muted)
+        }
+        Spacer(Modifier.height(1.dp))
+    }
+}
+
+// ============ form ============
+
+@Composable
+private fun FormBody(vm: AppViewModel) {
+    val ev = vm.event ?: return
+    Column(Modifier.fillMaxSize()) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Text("Your details", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
+            key(vm.formVersion) {
+                ev.fields.forEach { f -> if (vm.visible(f)) FieldView(vm, f) }
+            }
+            Spacer(Modifier.height(8.dp))
+        }
+        if (vm.formMessage.isNotEmpty())
+            Text(vm.formMessage, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(vertical = 8.dp))
+        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            BigButton(L_BACK, { vm.backToWelcome() }, primary = false, enabled = !vm.submitting)
+            BigButton(if (vm.submitting) "Please wait…" else L_SUBMIT, { vm.submit() }, Modifier.weight(1f), enabled = !vm.submitting)
+        }
+    }
+    if (vm.showConsent) ConsentDialog(vm, ev)
+}
+
+@Composable
+private fun ConsentDialog(vm: AppViewModel, ev: EventInfo) {
+    AlertDialog(
+        onDismissRequest = {},
+        title = { Text("Before you register", fontWeight = FontWeight.ExtraBold) },
+        text = { Column(Modifier.verticalScroll(rememberScrollState())) { Text(ev.consentText.ifBlank { "I agree that my details may be used for this event." }) } },
+        confirmButton = { TextButton(onClick = { vm.agree() }) { Text("I agree", fontWeight = FontWeight.ExtraBold) } },
+        dismissButton = { TextButton(onClick = { vm.decline() }) { Text("No thanks") } }
+    )
+}
+
+@Composable
+private fun FieldLabel(f: Field) {
+    Text(f.name + if (f.required) " *" else "", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+}
+
+@Composable
+private fun FieldView(vm: AppViewModel, f: Field) {
+    if (f.unsupported) return
+    if (f.isStatic) {
+        Text(f.name, fontSize = 16.sp, color = Muted, textAlign = if (f.type == "text_center") TextAlign.Center else if (f.type == "text_right") TextAlign.End else TextAlign.Start, modifier = Modifier.fillMaxWidth())
+        return
+    }
+    val err = vm.errors[f.id]
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        FieldLabel(f)
+        when {
+            f.isSignature -> SignaturePad({ vm.setSignature(f.id, it) })
+            f.isMulti -> Column {
+                f.options.forEach { o ->
+                    val sel = o in vm.multi[f.id].orEmpty()
+                    Row(
+                        Modifier.fillMaxWidth().clickable {
+                            val cur = vm.multi[f.id].orEmpty()
+                            vm.setMulti(f.id, if (sel) cur - o else cur + o)
+                        }.padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Checkbox(sel, null)
+                        Spacer(Modifier.width(10.dp))
+                        Text(o, fontSize = 18.sp)
                     }
                 }
             }
-        }
-        else -> OutlinedTextField(
-            value = vm.editValues[f.id].orEmpty(), onValueChange = { vm.editValues[f.id] = it; vm.clearMsg() },
-            label = { Text(label) }, modifier = Modifier.fillMaxWidth(),
-            singleLine = f.type != "textarea",
-            keyboardOptions = KeyboardOptions(
-                keyboardType = when (f.type) {
+            f.isRadio -> Row(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                f.options.forEach { o ->
+                    val sel = vm.values[f.id] == o
+                    Box(
+                        Modifier.clip(RoundedCornerShape(26.dp))
+                            .background(if (sel) LocalAccent.current else MaterialTheme.colorScheme.surfaceVariant)
+                            .clickable { vm.setValue(f.id, o) }.padding(horizontal = 22.dp, vertical = 14.dp)
+                    ) { Text(o, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = if (sel) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onBackground) }
+                }
+            }
+            f.isChoice -> ChoiceField(vm, f)
+            f.type == "date" -> DateField(vm, f)
+            else -> {
+                val kb = when (f.type) {
+                    "numeric" -> KeyboardType.Number
                     "email" -> KeyboardType.Email
-                    "phone" -> KeyboardType.Phone
-                    "number" -> KeyboardType.Number
                     else -> KeyboardType.Text
                 }
-            )
-        )
+                OutlinedTextField(
+                    value = vm.values[f.id].orEmpty(), onValueChange = { vm.setValue(f.id, it) },
+                    modifier = Modifier.fillMaxWidth(),
+                    placeholder = { if (f.placeholder.isNotBlank()) Text(f.placeholder) },
+                    singleLine = !f.isLong, minLines = if (f.isLong) 3 else 1,
+                    keyboardOptions = KeyboardOptions(keyboardType = kb),
+                    isError = err != null, shape = RoundedCornerShape(16.dp),
+                    textStyle = LocalTextStyleLarge()
+                )
+            }
+        }
+        if (err != null) Text(err, color = MaterialTheme.colorScheme.error, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
     }
 }
 
-// ---------------------------------------------------------------- sync
 @Composable
-fun SyncScreen(vm: AppViewModel) {
-    Page(title = "Sync", subtitle = if (vm.online) "Online" else "Offline", onBack = { vm.back() }) {
-        val pending = vm.queue.count { !it.failed }
-        val failed = vm.queue.count { it.failed }
-        Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant), shape = RoundedCornerShape(20.dp), modifier = Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Waiting to send", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp)
-                Text("$pending", fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, color = MaterialTheme.colorScheme.primary)
-                if (failed > 0) Text("$failed need attention", color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
+private fun LocalTextStyleLarge() = LocalTextStyle.current.copy(fontSize = 19.sp)
+
+@Composable
+private fun ChoiceField(vm: AppViewModel, f: Field) {
+    var open by remember { mutableStateOf(false) }
+    val cur = vm.values[f.id].orEmpty()
+    Box {
+        Row(
+            Modifier.fillMaxWidth().height(58.dp).clip(RoundedCornerShape(16.dp))
+                .border(1.dp, if (vm.errors[f.id] != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
+                .clickable { open = true }.padding(horizontal = 16.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(cur.ifBlank { f.placeholder.ifBlank { "Choose" } }, fontSize = 19.sp, color = if (cur.isBlank()) Muted else MaterialTheme.colorScheme.onBackground)
+            Text("▾", fontSize = 20.sp, color = Muted)
+        }
+        DropdownMenu(open, { open = false }) {
+            f.options.forEach { o -> DropdownMenuItem(text = { Text(o, fontSize = 18.sp) }, onClick = { vm.setValue(f.id, o); open = false }) }
+        }
+    }
+}
+
+@Composable
+private fun DateField(vm: AppViewModel, f: Field) {
+    val ctx = LocalContext.current
+    val cur = vm.values[f.id].orEmpty()
+    Row(
+        Modifier.fillMaxWidth().height(58.dp).clip(RoundedCornerShape(16.dp))
+            .border(1.dp, if (vm.errors[f.id] != null) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline, RoundedCornerShape(16.dp))
+            .clickable {
+                val c = Calendar.getInstance()
+                DatePickerDialog(ctx, { _, y, m, d -> vm.setValue(f.id, String.format(Locale.US, "%04d-%02d-%02d", y, m + 1, d)) },
+                    c.get(Calendar.YEAR), c.get(Calendar.MONTH), c.get(Calendar.DAY_OF_MONTH)).show()
+            }.padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) { Text(cur.ifBlank { f.placeholder.ifBlank { "Pick a date" } }, fontSize = 19.sp, color = if (cur.isBlank()) Muted else MaterialTheme.colorScheme.onBackground) }
+}
+
+// ============ outcome ============
+
+@Composable
+private fun OutcomeBody(vm: AppViewModel) {
+    val o = vm.outcome ?: return
+    val offline = o.kind == Outcome.Kind.SAVED_OFFLINE
+    Column(Modifier.fillMaxSize()) {
+        Column(Modifier.weight(1f).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            if (offline) Box(Modifier.size(64.dp).clip(CircleShape).background(Warn), contentAlignment = Alignment.Center) { Text("!", color = WarnInk, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold) }
+            else CheckBadge(64)
+            Text(o.title, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 42.sp)
+            Text(o.message, fontSize = 20.sp, color = Muted)
+            if (o.pin.isNotBlank()) {
+                Column(Modifier.clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(horizontal = 24.dp, vertical = 16.dp)) {
+                    Text("Your code", color = Muted, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(o.pin, fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 4.sp)
+                }
+            }
+            if (offline && vm.queue.isNotEmpty())
+                Text("${vm.queue.size} registration${if (vm.queue.size == 1) "" else "s"} waiting to send", fontWeight = FontWeight.SemiBold, color = Muted)
+        }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            BigButton(L_DONE, { vm.resetAll() }, Modifier.weight(1f), height = 72)
+            if (offline) BigButton("Send now", { vm.flushQueue() }, primary = false, height = 72)
+        }
+        Text("The form clears for the next person in ${vm.countdown} seconds", color = Muted, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+            modifier = Modifier.fillMaxWidth().padding(top = 12.dp), textAlign = TextAlign.Center)
+    }
+}
+
+// ============ setup / staff ============
+
+@Composable
+private fun SetupScreen(vm: AppViewModel) {
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(28.dp).widthIn(max = 640.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text("EazyTagg Register", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
+        Text("Set this tablet up once. Staff only.", color = Muted, fontSize = 17.sp)
+        OutlinedTextField(vm.serverInput, { vm.serverInput = it }, Modifier.fillMaxWidth(), label = { Text("Server address") },
+            placeholder = { Text("192.168.0.120/eazytagg_test") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
+        OutlinedTextField(vm.codeInput, { vm.codeInput = it }, Modifier.fillMaxWidth(), label = { Text("Event code") }, singleLine = true)
+        if (!vm.staffPinSet) OutlinedTextField(vm.staffPinInput, { vm.staffPinInput = it.filter(Char::isDigit).take(4) }, Modifier.fillMaxWidth(),
+            label = { Text("Staff PIN (4 digits)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
+        if (vm.setupMessage.isNotEmpty()) Text(vm.setupMessage, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
+        BigButton(if (vm.setupBusy) "Connecting…" else "Save and start", { vm.saveSetup() }, Modifier.fillMaxWidth(), enabled = !vm.setupBusy)
+    }
+}
+
+@Composable
+private fun GateScreen(vm: AppViewModel) {
+    Column(Modifier.fillMaxSize().padding(28.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(18.dp, Alignment.CenterVertically)) {
+        Text("Staff PIN", fontSize = 32.sp, fontWeight = FontWeight.ExtraBold)
+        PinDots(vm.gatePin.length)
+        if (vm.gateError.isNotEmpty()) Text(vm.gateError, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
+        Box(Modifier.widthIn(max = 360.dp)) { Keypad(vm::gateKey, vm::gateDelete, keyH = 60) }
+        BigButton("Cancel", { vm.gateCancel() }, primary = false, height = 52)
+    }
+}
+
+@Composable
+private fun SettingRow(title: String, sub: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Column(Modifier.weight(1f)) {
+            Text(title, fontWeight = FontWeight.Bold, fontSize = 17.sp)
+            Text(sub, color = Muted, fontSize = 14.sp)
+        }
+        Switch(checked, onChange)
+    }
+}
+
+@Composable
+private fun StaffScreen(vm: AppViewModel) {
+    val ev = vm.event
+    val fmt = remember { SimpleDateFormat("d MMM, HH:mm", Locale.getDefault()) }
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(28.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+            Text("Staff settings", fontSize = 30.sp, fontWeight = FontWeight.ExtraBold)
+            BigButton("Back to kiosk", { vm.leaveStaff() }, height = 52, radius = 26)
+        }
+        HorizontalDivider()
+        Text("Form from the system", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+        Text(ev?.let { "${it.title.ifBlank { it.code }} · ${it.fields.size} fields" } ?: "Not loaded", color = Muted)
+        Text(if (vm.lastRefreshed > 0) "Last updated ${fmt.format(Date(vm.lastRefreshed))}" else "Never updated", color = Muted)
+        if (vm.refreshNote.isNotEmpty()) Text(vm.refreshNote, color = Muted, fontSize = 14.sp)
+        BigButton(if (vm.refreshing) "Updating…" else "Refresh now", { vm.refresh() }, enabled = !vm.refreshing, height = 56, radius = 28)
+        ev?.let { e ->
+            Text("Fields (name · type)", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
+            e.fields.forEach { f ->
+                Text("${f.name.take(60)} · ${f.type}${if (f.required) " · required" else ""}${if (f.isStatic) " · shown as text" else ""}${if (f.unsupported) " · not supported here" else ""}",
+                    color = Muted, fontSize = 14.sp)
             }
         }
-        if (vm.syncNote.isNotBlank()) Text(vm.syncNote, fontSize = 13.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Button(onClick = { vm.networkBack() }, enabled = !vm.syncing && pending > 0, modifier = Modifier.fillMaxWidth().height(52.dp)) {
-            Text(if (vm.syncing) "Sending..." else "Send now", fontWeight = FontWeight.Bold)
-        }
-        if (vm.queue.isEmpty()) Text("Everything has been sent.", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        HorizontalDivider(Modifier.padding(vertical = 6.dp))
+        Text("Kiosk", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+        SettingRow("Ask "Did you preregister?" first", "Pop-up with QR code or PIN check-in", vm.askPrereg, vm::setAskPrereg)
+        SettingRow("Test mode", "Registrations are marked as tests", vm.testMode, vm::setTestMode)
+        SettingRow("Dark screen", "Dark colours instead of light", vm.darkTheme, vm::setDark)
+        Text("Clear the form after ${vm.resetSeconds} seconds", fontWeight = FontWeight.Bold)
+        Slider(vm.resetSeconds.toFloat(), { vm.setResetSeconds(it.toInt()) }, valueRange = 5f..30f)
+        HorizontalDivider(Modifier.padding(vertical = 6.dp))
+        Text("Waiting to send (${vm.queue.size})", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+        if (vm.syncNote.isNotEmpty()) Text(vm.syncNote, color = Muted, fontSize = 14.sp)
         vm.queue.forEach { op ->
-            Card(colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface), border = BorderStroke(1.dp, if (op.failed) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline), shape = RoundedCornerShape(16.dp), modifier = Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                Column(Modifier.weight(1f)) {
                     Text(op.label, fontWeight = FontWeight.SemiBold)
-                    Text("${timeText(op.at)} · ${op.agent}", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (op.failed) {
-                        Text(op.error.ifBlank { "The server refused this." }, color = MaterialTheme.colorScheme.error, fontSize = 13.sp)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            OutlinedButton(onClick = { vm.retryFailed(op) }) { Text("Try again") }
-                            TextButton(onClick = { vm.discard(op) }) { Text("Discard") }
-                        }
-                    }
+                    Text(if (op.failed) "Refused: ${op.error}" else "Waiting", color = if (op.failed) MaterialTheme.colorScheme.error else Muted, fontSize = 13.sp)
                 }
+                if (op.failed) TextButton({ vm.retryFailed(op) }) { Text("Retry") }
+                TextButton({ vm.discard(op) }) { Text("Discard") }
             }
         }
-    }
-}
-
-// ---------------------------------------------------------------- activity
-@Composable
-fun ActivityScreen(vm: AppViewModel) {
-    Page(
-        title = "Activity", subtitle = "Everything done on this device", onBack = { vm.back() },
-        actions = { TextButton(onClick = { vm.clearActivity() }) { Text("Clear") } }
-    ) {
-        val st = LocalStatus.current
-        if (vm.activity.isEmpty()) Text("Nothing yet.", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        vm.activity.asReversed().take(200).forEach { a ->
-            val (bg, fg) = when (a.result) {
-                "ok", "synced" -> st.okBg to st.okFg
-                "error" -> st.errBg to st.errFg
-                else -> st.warnBg to st.warnFg
-            }
-            Column(Modifier.fillMaxWidth()) {
-                SpaceBetween {
-                    Text(a.action, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
-                    Pill(a.result, bg, fg)
-                }
-                if (a.who.isNotBlank()) Text(a.who)
-                Text("${timeText(a.at)} · ${a.agent}" + if (a.detail.isNotBlank()) " · ${a.detail}" else "", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                HorizontalDivider(Modifier.padding(top = 8.dp))
-            }
-        }
-    }
-}
-
-// ---------------------------------------------------------------- settings
-@Composable
-fun SettingsScreen(vm: AppViewModel) {
-    Page(title = "Settings", onBack = { vm.back() }) {
-        Text("Appearance", fontWeight = FontWeight.Bold)
-        listOf("dark" to "Dark", "light" to "Light", "system" to "Follow the phone").forEach { (k, label) ->
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().clickable { vm.chooseTheme(k) }) {
-                RadioButton(selected = vm.theme == k, onClick = { vm.chooseTheme(k) })
-                Text(label)
-            }
-        }
-        HorizontalDivider()
-        Text("Server", fontWeight = FontWeight.Bold)
-        Text(vm.serverUrl.ifBlank { "Not set" }, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text("Signed in as", fontWeight = FontWeight.Bold)
-        Text("${vm.agentName} (${vm.email})", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        HorizontalDivider()
-        OutlinedButton(onClick = { vm.changeEvent() }, modifier = Modifier.fillMaxWidth().height(48.dp)) { Text("Change event") }
-        Button(
-            onClick = { vm.signOut() }, modifier = Modifier.fillMaxWidth().height(48.dp),
-            colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.surfaceVariant, contentColor = MaterialTheme.colorScheme.onSurface)
-        ) { Text("Sign out / change server") }
-        Text("EazyTagg Register 0.1.0", fontSize = 12.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (vm.queue.any { !it.failed }) BigButton(if (vm.syncing) "Sending…" else "Send now", { vm.flushQueue() }, enabled = !vm.syncing, height = 52, radius = 26)
+        HorizontalDivider(Modifier.padding(vertical = 6.dp))
+        Text("Server and event", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
+        OutlinedTextField(vm.serverInput, { vm.serverInput = it }, Modifier.fillMaxWidth(), label = { Text("Server address") }, singleLine = true)
+        OutlinedTextField(vm.codeInput, { vm.codeInput = it }, Modifier.fillMaxWidth(), label = { Text("Event code") }, singleLine = true)
+        OutlinedTextField(vm.staffPinInput, { vm.staffPinInput = it.filter(Char::isDigit).take(4) }, Modifier.fillMaxWidth(),
+            label = { Text("New staff PIN (optional)") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword))
+        if (vm.setupMessage.isNotEmpty()) Text(vm.setupMessage, color = MaterialTheme.colorScheme.error)
+        BigButton(if (vm.setupBusy) "Connecting…" else "Save server settings", { vm.saveSetup() }, enabled = !vm.setupBusy, height = 52, radius = 26)
+        Spacer(Modifier.height(30.dp))
     }
 }

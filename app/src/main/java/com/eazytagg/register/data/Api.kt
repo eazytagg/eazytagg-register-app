@@ -11,9 +11,7 @@ import java.util.concurrent.TimeUnit
 
 /** Result of one call to the EazyTagg PHP API. */
 sealed class ApiResult {
-    /** Server answered with JSON. [status] is the "status" field (success / error / exists). */
     data class Reply(val status: String, val message: String, val json: JSONObject) : ApiResult()
-    /** Could not reach the server (offline, wrong address, timeout, not JSON). */
     data class NoConnection(val reason: String) : ApiResult()
 }
 
@@ -21,10 +19,9 @@ object Api {
     private val client = OkHttpClient.Builder()
         .connectTimeout(8, TimeUnit.SECONDS)
         .readTimeout(20, TimeUnit.SECONDS)
-        .writeTimeout(20, TimeUnit.SECONDS)
+        .writeTimeout(30, TimeUnit.SECONDS)
         .build()
 
-    /** Drop pooled sockets, which go stale when Wi-Fi drops and returns. */
     fun resetConnections() { client.connectionPool.evictAll() }
 
     private val JSON = "application/json; charset=utf-8".toMediaType()
@@ -57,15 +54,13 @@ object Api {
     suspend fun call(base: String, endpoint: String, payload: JSONObject? = null): ApiResult =
         withContext(Dispatchers.IO) {
             try {
-                val url = base + "api/" + endpoint
-                val req = Request.Builder().url(url).apply {
+                val req = Request.Builder().url(base + "api/" + endpoint).apply {
                     if (payload == null) get() else post(payload.toString().toRequestBody(JSON))
                 }.build()
                 client.newCall(req).execute().use { resp ->
                     val text = resp.body?.string().orEmpty()
-                    if (resp.code >= 500 && !text.contains("{")) {
-                        ApiResult.NoConnection("Server error (${resp.code})")
-                    } else parse(text)
+                    if (resp.code >= 500 && !text.contains("{")) ApiResult.NoConnection("Server error (${resp.code})")
+                    else parse(text)
                 }
             } catch (e: Exception) {
                 ApiResult.NoConnection(e.message ?: "No connection")
@@ -74,16 +69,25 @@ object Api {
 
     suspend fun ping(base: String) = call(base, "ping.php")
 
-    suspend fun login(base: String, user: String, pass: String) =
-        call(base, "agent.auth.php", JSONObject().put("username", user).put("password", pass))
-
     suspend fun getEvent(base: String, code: String) =
         call(base, "get.event.php", JSONObject().put("event_code", code))
 
-    /** Walk-in registration. The server also clocks the person in and prints their tag. */
-    suspend fun submit(base: String, code: String, entryData: String, consent: String, at: Long? = null): ApiResult {
+    /** Registers a new attendee. The server also checks them in and prints their tag. */
+    suspend fun submit(
+        base: String, code: String, entryData: String, consent: String,
+        testMode: Boolean, at: Long? = null
+    ): ApiResult {
         val p = JSONObject().put("event_code", code).put("entry_data", entryData).put("consent", consent)
+        p.put("test_mode", if (testMode) "yes" else "no")
         if (at != null && at > 0) p.put("scanned_at", at)
         return call(base, "submit.entry.php", p)
     }
+
+    /** Someone who registered earlier enters their 4-digit code. */
+    suspend fun pin(base: String, code: String, pin: String) =
+        call(base, "pin.entry.php", JSONObject().put("event_code", code).put("pin_code", pin))
+
+    /** Someone who registered earlier shows their QR code (attendee id). */
+    suspend fun checkin(base: String, code: String, uuid: String) =
+        call(base, "log.checkin.php", JSONObject().put("event_code", code).put("attendee_uuid", uuid))
 }

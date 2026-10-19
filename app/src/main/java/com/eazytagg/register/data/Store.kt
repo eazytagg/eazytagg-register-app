@@ -2,10 +2,9 @@ package com.eazytagg.register.data
 
 import android.content.Context
 import org.json.JSONArray
-import org.json.JSONObject
 import java.io.File
 
-/** Small on-device storage: settings, the offline queue and the activity log. */
+/** Small on-device storage: staff settings, the cached event and the offline queue. */
 class Store(private val ctx: Context) {
     private val prefs = ctx.getSharedPreferences("eazytagg_register", Context.MODE_PRIVATE)
     private val lock = Any()
@@ -14,26 +13,39 @@ class Store(private val ctx: Context) {
         get() = prefs.getString("base", "") ?: ""
         set(v) = prefs.edit().putString("base", v).apply()
 
-    var agentName: String
-        get() = prefs.getString("agent", "") ?: ""
-        set(v) = prefs.edit().putString("agent", v).apply()
-
-    var agentEmail: String
-        get() = prefs.getString("email", "") ?: ""
-        set(v) = prefs.edit().putString("email", v).apply()
-
-    var signedIn: Boolean
-        get() = prefs.getBoolean("signedIn", false)
-        set(v) = prefs.edit().putBoolean("signedIn", v).apply()
+    var eventCode: String
+        get() = prefs.getString("code", "") ?: ""
+        set(v) = prefs.edit().putString("code", v).apply()
 
     var eventJson: String
         get() = prefs.getString("event", "") ?: ""
         set(v) = prefs.edit().putString("event", v).apply()
 
-    /** dark (default) | light | system */
-    var theme: String
-        get() = prefs.getString("theme", "dark") ?: "dark"
-        set(v) = prefs.edit().putString("theme", v).apply()
+    var staffPin: String
+        get() = prefs.getString("staffPin", "") ?: ""
+        set(v) = prefs.edit().putString("staffPin", v).apply()
+
+    var lastRefreshed: Long
+        get() = prefs.getLong("refreshed", 0L)
+        set(v) = prefs.edit().putLong("refreshed", v).apply()
+
+    /** Ask "Did you preregister?" before the form. */
+    var askPrereg: Boolean
+        get() = prefs.getBoolean("askPrereg", true)
+        set(v) = prefs.edit().putBoolean("askPrereg", v).apply()
+
+    var testMode: Boolean
+        get() = prefs.getBoolean("test", false)
+        set(v) = prefs.edit().putBoolean("test", v).apply()
+
+    var darkTheme: Boolean
+        get() = prefs.getBoolean("dark", false)
+        set(v) = prefs.edit().putBoolean("dark", v).apply()
+
+    /** Seconds the "registered" screen shows before the form clears for the next person. */
+    var resetSeconds: Int
+        get() = prefs.getInt("reset", 12)
+        set(v) = prefs.edit().putInt("reset", v).apply()
 
     private fun file(name: String) = File(ctx.filesDir, name)
 
@@ -44,27 +56,13 @@ class Store(private val ctx: Context) {
         } catch (e: Exception) { JSONArray() }
     }
 
-    private fun writeArray(name: String, arr: JSONArray) = synchronized(lock) {
-        file(name).writeText(arr.toString())
-    }
-
     fun loadQueue(): List<QueuedOp> {
         val a = readArray("queue.json")
         return (0 until a.length()).map { QueuedOp.fromJson(a.getJSONObject(it)) }
     }
 
-    fun saveQueue(items: List<QueuedOp>) {
+    fun saveQueue(items: List<QueuedOp>) = synchronized(lock) {
         val a = JSONArray(); items.forEach { a.put(it.toJson()) }
-        writeArray("queue.json", a)
-    }
-
-    fun loadActivity(): List<ActivityItem> {
-        val a = readArray("activity.json")
-        return (0 until a.length()).map { ActivityItem.fromJson(a.getJSONObject(it)) }
-    }
-
-    fun saveActivity(items: List<ActivityItem>) {
-        val a = JSONArray(); items.takeLast(500).forEach { a.put(it.toJson()) }
-        writeArray("activity.json", a)
+        file("queue.json").writeText(a.toString())
     }
 }
