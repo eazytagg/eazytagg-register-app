@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
@@ -22,6 +23,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
@@ -330,17 +337,33 @@ private fun FieldView(vm: AppViewModel, f: Field) {
             f.isChoice -> ChoiceField(vm, f)
             f.type == "date" -> DateField(vm, f)
             else -> {
-                val kb = when (f.type) {
-                    "numeric" -> KeyboardType.Number
-                    "email" -> KeyboardType.Email
+                val ev = vm.event
+                val isName = ev != null && f.id in ev.successField.split(' ')
+                val looksPhone = f.name.contains("phone", true) || f.name.contains("mobile", true) || f.name.contains("whatsapp", true) || f.name.contains("contact no", true)
+                val kb = when {
+                    f.type == "numeric" -> KeyboardType.Number
+                    f.type == "email" -> KeyboardType.Email
+                    looksPhone -> KeyboardType.Phone
                     else -> KeyboardType.Text
                 }
+                val caps = when {
+                    f.type == "email" || kb == KeyboardType.Number || kb == KeyboardType.Phone -> KeyboardCapitalization.None
+                    f.isLong -> KeyboardCapitalization.Sentences
+                    else -> KeyboardCapitalization.Words   // names, organisations, titles: every word starts with a capital
+                }
+                val focus = LocalFocusManager.current
+                val keyboard = LocalSoftwareKeyboardController.current
                 OutlinedTextField(
                     value = vm.values[f.id].orEmpty(), onValueChange = { vm.setValue(f.id, it) },
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) keyboard?.show() },
                     placeholder = { if (f.placeholder.isNotBlank()) Text(f.placeholder) },
                     singleLine = !f.isLong, minLines = if (f.isLong) 3 else 1,
-                    keyboardOptions = KeyboardOptions(keyboardType = kb),
+                    keyboardOptions = KeyboardOptions(
+                        capitalization = caps, keyboardType = kb,
+                        autoCorrectEnabled = !(isName || f.type == "email" || kb != KeyboardType.Text),
+                        imeAction = if (f.isLong) ImeAction.Default else ImeAction.Next
+                    ),
+                    keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Down) }),
                     isError = err != null, shape = RoundedCornerShape(16.dp),
                     textStyle = LocalTextStyleLarge()
                 )
