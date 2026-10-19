@@ -214,10 +214,10 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun leaveStaff() { resetAll() }
 
-    fun setAskPrereg(v: Boolean) { askPrereg = v; store.askPrereg = v }
-    fun setTestMode(v: Boolean) { testMode = v; store.testMode = v }
-    fun setDark(v: Boolean) { darkTheme = v; store.darkTheme = v }
-    fun setResetSeconds(v: Int) { resetSeconds = v; store.resetSeconds = v }
+    fun updateAskPrereg(v: Boolean) { askPrereg = v; store.askPrereg = v }
+    fun updateTestMode(v: Boolean) { testMode = v; store.testMode = v }
+    fun updateDark(v: Boolean) { darkTheme = v; store.darkTheme = v }
+    fun updateResetSeconds(v: Int) { resetSeconds = v; store.resetSeconds = v }
     fun changeStaffPin(p: String) { if (p.length == 4) store.staffPin = p }
 
     // ================= welcome / choose =================
