@@ -73,7 +73,7 @@ private fun PoweredBy(vm: AppViewModel, onDark: Boolean = false) {
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { vm.logoTap() }
             .padding(horizontal = 10.dp, vertical = 6.dp)) {
         Text("Powered by", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-        Image(painterResource(R.drawable.eazytagg_logo), "EazyTagg", Modifier.height(26.dp), contentScale = ContentScale.Fit)
+        Image(painterResource(R.drawable.eazytagg_logo), "EazyTagg", Modifier.height(36.dp), contentScale = ContentScale.Fit)
     }
 }
 
