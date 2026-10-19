@@ -58,6 +58,11 @@ private const val L_SUBMIT = "Register"
 private const val L_BACK = "Back"
 private const val L_DONE = "Done"
 
+private fun prettyDate(d: String): String = try {
+    val t = d.trim().take(10)
+    SimpleDateFormat("d MMM yyyy", Locale.getDefault()).format(SimpleDateFormat("yyyy-MM-dd", Locale.US).parse(t)!!)
+} catch (e: Exception) { d }
+
 private fun String.url(base: String) = if (isBlank()) "" else if (startsWith("http")) this else base + "uploads/" + this
 
 @Composable
@@ -140,14 +145,16 @@ private fun BrandPanel(vm: AppViewModel, compact: Boolean) {
             verticalArrangement = if (compact) Arrangement.spacedBy(6.dp) else Arrangement.SpaceBetween
         ) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                if (logo.isNotEmpty()) AsyncImage(logo, null, Modifier.height(if (compact) 36.dp else 64.dp).widthIn(max = 220.dp), contentScale = ContentScale.Fit)
+                if (logo.isNotEmpty()) Box(Modifier.clip(RoundedCornerShape(12.dp)).background(Color.White).padding(horizontal = 10.dp, vertical = 6.dp)) {
+                    AsyncImage(logo, null, Modifier.height(if (compact) 30.dp else 56.dp).widthIn(max = 220.dp), contentScale = ContentScale.Fit)
+                }
                 else Text("EazyTagg", color = textColor, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
                 if (!vm.online) Chip("Offline", Warn, WarnInk)
             }
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(ev.title.ifBlank { "Welcome" }, color = textColor, fontWeight = FontWeight.ExtraBold,
                     fontSize = if (compact) 22.sp else 44.sp, lineHeight = if (compact) 26.sp else 48.sp)
-                val sub = listOf(ev.dateText, ev.venue).filter { it.isNotBlank() }.joinToString("  ·  ")
+                val sub = listOf(prettyDate(ev.dateText), ev.venue).filter { it.isNotBlank() }.joinToString("  ·  ")
                 if (sub.isNotEmpty()) Text(sub, color = textColor, fontSize = if (compact) 14.sp else 20.sp, fontWeight = FontWeight.SemiBold)
             }
             if (!compact) {
