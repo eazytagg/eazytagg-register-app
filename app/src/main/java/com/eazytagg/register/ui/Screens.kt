@@ -467,7 +467,7 @@ private fun StaffScreen(vm: AppViewModel) {
         }
         HorizontalDivider(Modifier.padding(vertical = 6.dp))
         Text("Kiosk", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
-        SettingRow("Ask "Did you preregister?" first", "Pop-up with QR code or PIN check-in", vm.askPrereg, vm::setAskPrereg)
+        SettingRow("Ask if they preregistered first", "Pop-up with QR code or PIN check-in", vm.askPrereg, vm::setAskPrereg)
         SettingRow("Test mode", "Registrations are marked as tests", vm.testMode, vm::setTestMode)
         SettingRow("Dark screen", "Dark colours instead of light", vm.darkTheme, vm::setDark)
         Text("Clear the form after ${vm.resetSeconds} seconds", fontWeight = FontWeight.Bold)
