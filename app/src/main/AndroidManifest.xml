@@ -8,10 +8,10 @@
 
     <application
         android:allowBackup="false"
-        android:icon="@drawable/ic_launcher"
-        android:label="EazyTagg Register"
+        android:icon="@mipmap/ic_launcher"
+        android:label="PDynamics Reg"
         android:usesCleartextTraffic="true"
-        android:theme="@style/Theme.EazyTagg">
+        android:theme="@style/Theme.PDynamics">
         <activity
             android:name=".MainActivity"
             android:exported="true"

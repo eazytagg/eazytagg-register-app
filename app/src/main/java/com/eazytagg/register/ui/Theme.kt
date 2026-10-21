@@ -17,7 +17,7 @@ val Warn = Color(0xFFFFF1D6)
 val WarnInk = Color(0xFF7A4A00)
 val Bad = Color(0xFFB3261E)
 
-val DefaultAccent = Color(0xFFF68B20)
+val DefaultAccent = Color(0xFF009FE3)
 
 /** Accent colour comes from the event's colour in the system. */
 val LocalAccent = staticCompositionLocalOf { DefaultAccent }
@@ -31,7 +31,7 @@ fun parseAccent(s: String): Color = try {
 fun Color.isLight(): Boolean = (0.299 * red + 0.587 * green + 0.114 * blue) > 0.6
 
 @Composable
-fun EazyTheme(accent: Color, dark: Boolean, content: @Composable () -> Unit) {
+fun PDynamicsTheme(accent: Color, dark: Boolean, content: @Composable () -> Unit) {
     val onAccent = if (accent.isLight()) Ink else Color.White
     val scheme = if (dark) darkColorScheme(
         primary = accent, onPrimary = onAccent, background = Color(0xFF121315), onBackground = Color.White,

@@ -3,7 +3,7 @@ package com.eazytagg.register.data
 import org.json.JSONArray
 import org.json.JSONObject
 
-/** One field of the event form, as defined in the EazyTagg system (App section / event fields). */
+/** One field of the event form, as defined in the PDynamics system (App section / event fields). */
 data class Field(
     val id: String,
     val name: String,

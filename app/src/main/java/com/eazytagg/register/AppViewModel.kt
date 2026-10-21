@@ -47,7 +47,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         private set
 
     // ---- staff settings (mirrors Store) ----
-    var serverInput by mutableStateOf(store.baseUrl)
+    var serverInput by mutableStateOf(ServerAddress.displayIp(store.baseUrl))
     var codeInput by mutableStateOf(store.eventCode)
     var staffPinInput by mutableStateOf("")
     var setupMessage by mutableStateOf("")
@@ -147,20 +147,24 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     // ================= setup =================
     fun saveSetup() {
-        val base = Api.normalizeBase(serverInput)
+        if (setupBusy) return
+        val ip = ServerAddress.ip(serverInput)
         val code = codeInput.trim()
-        if (base.isEmpty()) { setupMessage = "Enter the server address."; return }
+        if (ip == null) { setupMessage = "Enter only the server IP address, for example 192.168.0.39."; return }
         if (code.isEmpty()) { setupMessage = "Enter the event code."; return }
         viewModelScope.launch {
             setupBusy = true; setupMessage = ""
-            when (val r = Api.getEvent(base, code)) {
+            val (base, result) = Api.connectToEvent(ip, code, store.baseUrl)
+            when (val r = result) {
                 is ApiResult.NoConnection -> setupMessage = "Cannot reach the server: ${r.reason}"
                 is ApiResult.Reply -> {
-                    if (r.status != "success") setupMessage = r.message.ifBlank { "That event code was not accepted." }
+                    if (base.isEmpty()) setupMessage = "The registration server was not found. Check the IP address and connect this tablet to the same network as the server."
+                    else if (r.status != "success") setupMessage = r.message.ifBlank { "That event code was not accepted." }
+                    else if (queue.isNotEmpty() && store.baseUrl.isNotBlank() && base != store.baseUrl) setupMessage = "Sync the registrations waiting on this tablet before changing the server."
                     else {
                         val ev = EventInfo.fromServer(code, r.json)
                         store.baseUrl = base; store.eventCode = code
-                        serverInput = base
+                        serverInput = ip
                         event = ev; store.eventJson = ev.toJson()
                         store.lastRefreshed = System.currentTimeMillis(); lastRefreshed = store.lastRefreshed
                         online = true
@@ -173,7 +177,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     // ================= refresh from the system =================
-    /** Pulls the form, logo, colours and rules again from the EazyTagg App section. */
+    /** Pulls the form, logo, colours and rules again from the PDynamics App section. */
     fun refresh() {
         if (refreshing || store.baseUrl.isBlank() || store.eventCode.isBlank()) return
         viewModelScope.launch {
@@ -256,6 +260,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun chooseScan() { codeMessage = ""; lastCode = ""; screen = Screen.Scan }
     fun backToChoose() { screen = Screen.Choose }
     fun backToWelcome() { screen = Screen.Welcome }
+    fun cancelRegistration() { if (!submitting) { clearForm(); screen = Screen.Welcome } }
 
     private var lastCode = ""
     private var lastCodeAt = 0L
@@ -268,7 +273,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         if (text == lastCode && now - lastCodeAt < 4000) return
         lastCode = text; lastCodeAt = now
         val uuid = uuidRe.find(text)?.value
-        if (uuid == null) { codeMessage = "That is not an EazyTagg code."; return }
+        if (uuid == null) { codeMessage = "That is not a PDynamics code."; return }
         val ev = event ?: return
         viewModelScope.launch {
             codeBusy = true
@@ -395,7 +400,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun agree() { showConsent = false; doSubmit("yes") }
-    fun decline() { showConsent = false; formMessage = "Your registration was not saved because consent was declined." }
+    fun decline() { showConsent = false; doSubmit("no") }
 
     private fun entryJson(ev: EventInfo): JSONObject {
         val data = JSONObject()
@@ -476,8 +481,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     fun flushQueue() {
         if (syncing || queue.none { !it.failed }) return
+        syncing = true
         viewModelScope.launch {
-            syncing = true
             var sent = 0
             try {
                 val base = store.baseUrl

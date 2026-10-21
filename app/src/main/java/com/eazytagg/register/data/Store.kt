@@ -1,6 +1,7 @@
 package com.eazytagg.register.data
 
 import android.content.Context
+import android.util.AtomicFile
 import org.json.JSONArray
 import java.io.File
 
@@ -49,10 +50,17 @@ class Store(private val ctx: Context) {
 
     private fun file(name: String) = File(ctx.filesDir, name)
 
+    private fun writeAtomic(name: String, data: String) {
+        val target = AtomicFile(file(name))
+        val out = target.startWrite()
+        try { out.write(data.toByteArray(Charsets.UTF_8)); target.finishWrite(out) }
+        catch (error: Exception) { target.failWrite(out); throw error }
+    }
+
     private fun readArray(name: String): JSONArray = synchronized(lock) {
         try {
             val f = file(name)
-            if (f.exists()) JSONArray(f.readText()) else JSONArray()
+            if (f.exists() || File(f.path + ".bak").exists()) JSONArray(AtomicFile(f).openRead().bufferedReader().use { it.readText() }) else JSONArray()
         } catch (e: Exception) { JSONArray() }
     }
 
@@ -63,6 +71,6 @@ class Store(private val ctx: Context) {
 
     fun saveQueue(items: List<QueuedOp>) = synchronized(lock) {
         val a = JSONArray(); items.forEach { a.put(it.toJson()) }
-        file("queue.json").writeText(a.toString())
+        writeAtomic("queue.json", a.toString())
     }
 }

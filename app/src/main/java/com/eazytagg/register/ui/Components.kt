@@ -2,6 +2,8 @@ package com.eazytagg.register.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -13,6 +15,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.layout.ContentScale
+import com.eazytagg.register.R
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
@@ -43,18 +48,22 @@ fun BigButton(
     val accent = st.color ?: LocalAccent.current
     val h = if (height >= 68 && st.height != null) st.height else height
     val fg = if (primary) (st.text ?: MaterialTheme.colorScheme.onPrimary) else MaterialTheme.colorScheme.onBackground
-    Box(
+    BoxWithConstraints(
         modifier
-            .height(h.dp)
+            .heightIn(min = h.dp)
             .clip(shape)
             .then(
                 if (primary) Modifier.background(if (enabled) accent else accent.copy(alpha = 0.4f))
                 else Modifier.border(BorderStroke(2.dp, MaterialTheme.colorScheme.onBackground.copy(alpha = if (enabled) 1f else 0.4f)), shape)
             )
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 36.dp),
+            .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
-    ) { Text(text, color = fg, fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center) }
+    ) {
+        val compact = maxWidth < 200.dp
+        Text(text, modifier = Modifier.padding(horizontal = if (compact) 12.dp else 24.dp, vertical = 12.dp),
+            color = fg, fontSize = if (compact) 18.sp else 20.sp,
+            fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
+    }
 }
 
 @Composable
@@ -167,5 +176,19 @@ fun SignaturePad(onChange: (String) -> Unit, modifier: Modifier = Modifier) {
                 Text("Sign here with your finger", Modifier.align(Alignment.Center), color = Color(0xFF9AA0AE), fontSize = 16.sp)
         }
         TextButton(onClick = { strokes.clear(); current = emptyList(); onChange("") }) { Text("Clear signature") }
+    }
+}
+
+/** Company wordmark is separate from the launcher icon and event artwork. */
+@Composable
+internal fun PoweredByLogo(onDark: Boolean = false, onClick: () -> Unit = {}) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.clip(RoundedCornerShape(12.dp))
+            .background(Color.White.copy(alpha = if (onDark || LocalDark.current) 0.95f else 0f))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp)) {
+        Text("Powered by", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+        Image(painterResource(R.drawable.pdynamics_logo), "Popular Dynamics",
+            Modifier.width(132.dp).height(42.dp), contentScale = ContentScale.Fit)
     }
 }

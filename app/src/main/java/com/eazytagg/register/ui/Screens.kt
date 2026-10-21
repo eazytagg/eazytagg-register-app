@@ -35,6 +35,7 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -67,7 +68,7 @@ fun Root(vm: AppViewModel) {
         u["btn_color"]?.let { parseAccent(it) }, u["btn_text_color"]?.let { parseAccent(it) },
         u["btn_radius"]?.toIntOrNull()?.coerceIn(0, 40), u["btn_height"]?.toIntOrNull()?.coerceIn(48, 100)
     )
-    EazyTheme(accent, vm.darkTheme) {
+    PDynamicsTheme(accent, vm.darkTheme) {
       CompositionLocalProvider(LocalButtonStyle provides style) {
         Surface(Modifier.fillMaxSize().imePadding(), color = MaterialTheme.colorScheme.background) {
             when (vm.screen) {
@@ -81,38 +82,22 @@ fun Root(vm: AppViewModel) {
     }
 }
 
-/** Fixed EazyTagg mark. Three quick taps open the staff settings. */
+/** Full Popular Dynamics wordmark. Three quick taps open the staff settings. */
 @Composable
 private fun PoweredBy(vm: AppViewModel, onDark: Boolean = false) {
-    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Color.White.copy(alpha = if (onDark) 0.95f else 0f))
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { vm.logoTap() }
-            .padding(horizontal = 10.dp, vertical = 6.dp)) {
-        Text("Powered by", color = Muted, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-        Image(painterResource(R.drawable.eazytagg_logo), "EazyTagg", Modifier.height(36.dp), contentScale = ContentScale.Fit)
-    }
+    PoweredByLogo(onDark = onDark, onClick = { vm.logoTap() })
 }
 
 // ============ layout shell: banner on the left (tablet) / on top (phone) ============
 
 @Composable
 private fun Kiosk(vm: AppViewModel) {
-    BoxWithConstraints(Modifier.fillMaxSize()) {
-        val wide = maxWidth >= 720.dp
-        val pad = if (wide) 64.dp else 22.dp
-        if (wide) {
-            Row(Modifier.fillMaxSize()) {
-                Box(Modifier.weight(0.42f).fillMaxHeight()) { BrandPanel(vm, compact = false) }
-                Box(Modifier.weight(0.58f).fillMaxHeight().padding(horizontal = pad, vertical = 40.dp)) { KioskBody(vm, true) }
-            }
-        } else {
-            Column(Modifier.fillMaxSize()) {
-                Box(Modifier.fillMaxWidth()) { BrandPanel(vm, compact = true) }
-                Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = pad, vertical = 18.dp)) { KioskBody(vm, false) }
-                Box(Modifier.fillMaxWidth().padding(bottom = 10.dp), contentAlignment = Alignment.Center) { PoweredBy(vm) }
-            }
-        }
-    }
+    AdaptiveKioskLayout(
+        form = vm.screen == Screen.Form,
+        brand = { compact -> BrandPanel(vm, compact) },
+        body = { wide -> KioskBody(vm, wide) },
+        footer = { PoweredBy(vm) }
+    )
 }
 
 @Composable
@@ -136,30 +121,41 @@ private fun BrandPanel(vm: AppViewModel, compact: Boolean) {
     val onAccent = MaterialTheme.colorScheme.onPrimary
     val bg = ev.bgPath.url(vm.serverBase)
     val logo = ev.logoPath.url(vm.serverBase)
-    Box(Modifier.fillMaxSize().background(accent)) {
+    val sub = listOf(prettyDate(ev.dateText), ev.venue).filter { it.isNotBlank() }.joinToString("  ·  ")
+    BoxWithConstraints(Modifier.fillMaxSize().background(accent)) {
+        val short = maxHeight < if (compact) 90.dp else 600.dp
         if (bg.isNotEmpty()) AsyncImage(bg, null, Modifier.matchParentSize(), contentScale = ContentScale.Crop)
         if (bg.isNotEmpty()) Box(Modifier.matchParentSize().background(Color(0x66000000)))
         val textColor = if (bg.isNotEmpty()) Color.White else onAccent
-        Column(
-            Modifier.fillMaxSize().padding(if (compact) 18.dp else 48.dp),
-            verticalArrangement = if (compact) Arrangement.spacedBy(6.dp) else Arrangement.SpaceBetween
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween, modifier = Modifier.fillMaxWidth()) {
-                if (logo.isNotEmpty()) Box(Modifier.clip(RoundedCornerShape(12.dp)).background(Color.White).padding(horizontal = 10.dp, vertical = 6.dp)) {
-                    AsyncImage(logo, null, Modifier.height(if (compact) 30.dp else 56.dp).widthIn(max = 220.dp), contentScale = ContentScale.Fit)
+        if (compact) {
+            val artwork = if (ev.ui["artwork_mode"] == "logo") logo.ifBlank { bg } else bg.ifBlank { logo }
+            if (artwork.isNotEmpty()) {
+                AsyncImage(artwork, "Event artwork", Modifier.matchParentSize(),
+                    contentScale = if (ev.ui["artwork_mode"] == "logo") ContentScale.Fit else ContentScale.Crop)
+            } else Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.Center) {
+                if (vm.flag("show_title")) Text(ev.title.ifBlank { "Welcome" }, color = textColor,
+                    fontWeight = FontWeight.ExtraBold, fontSize = if (short) 18.sp else 23.sp, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (sub.isNotEmpty()) Text(sub, color = textColor, fontSize = 12.sp, maxLines = 1)
+            }
+            if (!vm.online) Box(Modifier.align(Alignment.TopEnd).padding(8.dp)) { Chip("Offline", Warn, WarnInk) }
+        } else {
+            Column(Modifier.fillMaxSize().padding(if (short) 24.dp else 36.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween) {
+                    if (logo.isNotEmpty()) Box(Modifier.clip(RoundedCornerShape(12.dp)).background(Color.White).padding(8.dp)) {
+                        AsyncImage(logo, "Event logo", Modifier.height(if (short) 40.dp else 56.dp).widthIn(max = 180.dp), contentScale = ContentScale.Fit)
+                    } else Text("PDynamics", color = textColor, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
+                    if (!vm.online) Chip("Offline", Warn, WarnInk)
                 }
-                else Text("EazyTagg", color = textColor, fontWeight = FontWeight.ExtraBold, fontSize = 20.sp)
-                if (!vm.online) Chip("Offline", Warn, WarnInk)
-            }
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (vm.flag("show_title")) Text(ev.title.ifBlank { "Welcome" }, color = textColor, fontWeight = FontWeight.ExtraBold,
-                    fontSize = if (compact) 22.sp else 44.sp, lineHeight = if (compact) 26.sp else 48.sp)
-                val sub = listOf(prettyDate(ev.dateText), ev.venue).filter { it.isNotBlank() }.joinToString("  ·  ")
-                if (sub.isNotEmpty()) Text(sub, color = textColor, fontSize = if (compact) 14.sp else 20.sp, fontWeight = FontWeight.SemiBold)
-            }
-            if (!compact) {
+                Column(Modifier.padding(vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    if (vm.flag("show_title")) Text(ev.title.ifBlank { "Welcome" }, color = textColor,
+                        fontWeight = FontWeight.ExtraBold, fontSize = if (short) 30.sp else 40.sp,
+                        lineHeight = if (short) 34.sp else 44.sp, maxLines = if (short) 3 else 5, overflow = TextOverflow.Ellipsis)
+                    if (sub.isNotEmpty()) Text(sub, color = textColor, fontSize = if (short) 15.sp else 18.sp,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis)
+                }
                 Column(verticalArrangement = Arrangement.spacedBy(18.dp)) {
-                    if (vm.screen == Screen.Form && vm.flag("show_preview")) TagPreview(vm)
+                    if (!short && vm.screen == Screen.Form && vm.flag("show_preview")) TagPreview(vm)
                     PoweredBy(vm, onDark = true)
                 }
             }
@@ -200,21 +196,20 @@ private fun AskDialog(vm: AppViewModel) {
         onDismissRequest = { vm.dismissAsk() },
         properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
     ) {
-        Column(
-            Modifier.padding(24.dp).widthIn(max = 620.dp).fillMaxWidth()
-                .clip(RoundedCornerShape(36.dp)).background(MaterialTheme.colorScheme.surface)
-                .padding(horizontal = 40.dp, vertical = 44.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-            Text(vm.t("ask_title", "Did you preregister?"), fontSize = 38.sp, lineHeight = 42.sp,
-                fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
-            Text(vm.t("ask_text", "If you did, you can check in with your QR code or your PIN."), fontSize = 20.sp,
-                color = Muted, textAlign = TextAlign.Center, lineHeight = 27.sp)
-            Spacer(Modifier.height(14.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                BigButton(vm.t("ask_no", "No"), { vm.answerNo() }, Modifier.weight(1f), primary = false, height = 84)
-                BigButton(vm.t("ask_yes", "Yes"), { vm.answerYes() }, Modifier.weight(1f), height = 84)
+        BoxWithConstraints(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+            val compact = maxWidth < 480.dp || maxHeight < 600.dp
+            Column(Modifier.widthIn(max = 620.dp).fillMaxWidth().heightIn(max = maxHeight)
+                .clip(RoundedCornerShape(28.dp)).background(MaterialTheme.colorScheme.surface)
+                .verticalScroll(rememberScrollState()).padding(if (compact) 24.dp else 40.dp),
+                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Text(vm.t("ask_title", "Did you preregister?"), fontSize = if (compact) 28.sp else 38.sp,
+                    lineHeight = if (compact) 33.sp else 42.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
+                Text(vm.t("ask_text", "If you did, you can check in with your QR code or your PIN."),
+                    fontSize = if (compact) 17.sp else 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    BigButton(vm.t("ask_no", "No"), { vm.answerNo() }, Modifier.weight(1f), primary = false, height = 56)
+                    BigButton(vm.t("ask_yes", "Yes"), { vm.answerYes() }, Modifier.weight(1f), height = 56)
+                }
             }
         }
     }
@@ -226,7 +221,7 @@ private fun WelcomeBody(vm: AppViewModel) {
         Spacer(Modifier.height(1.dp))
         Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
             Text(vm.t("welcome_title", "Welcome."), fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 52.sp)
-            Text(vm.t("welcome_text", "Register here to get your name tag."), fontSize = 20.sp, color = Muted)
+            Text(vm.t("welcome_text", "Register here to get your name tag."), fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         BigButton(vm.t("start_label", "Register"), { vm.start() }, Modifier.fillMaxWidth(), height = 76)
     }
@@ -234,17 +229,12 @@ private fun WelcomeBody(vm: AppViewModel) {
 
 @Composable
 private fun ChooseBody(vm: AppViewModel) {
-    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            Text(vm.t("choose_title", "Check in"), fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 44.sp)
-            Text(vm.t("choose_text", "Show your QR code to the camera, or type the 4-digit PIN from your invitation."), fontSize = 19.sp, color = Muted)
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            BigButton(vm.t("scan_label", "Scan my QR code"), { vm.chooseScan() }, Modifier.fillMaxWidth(), height = 76)
-            BigButton(vm.t("code_label", "Enter my PIN"), { vm.chooseCode() }, Modifier.fillMaxWidth(), primary = false, height = 76)
-            if (vm.flag("show_back")) BigButton(vm.t("back_label", "Back"), { vm.backToWelcome() }, Modifier.fillMaxWidth(), primary = false, height = 56)
-        }
-    }
+    CheckInActions(
+        vm.t("choose_title", "Check in"),
+        vm.t("choose_text", "Show your QR code to the camera, or type the 4-digit PIN from your invitation."),
+        vm.t("scan_label", "Scan my QR code"), vm.t("code_label", "Enter my PIN"), vm.t("back_label", "Back"),
+        vm.flag("show_back"), { vm.chooseScan() }, { vm.chooseCode() }, { vm.backToWelcome() }
+    )
 }
 
 @Composable
@@ -263,7 +253,7 @@ private fun ScanBody(vm: AppViewModel) {
 private fun CodeBody(vm: AppViewModel, wide: Boolean) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(18.dp)) {
         Text(vm.t("code_title", "Enter your code"), fontSize = 36.sp, fontWeight = FontWeight.ExtraBold)
-        Text(vm.t("code_text", "The 4 digits on your invitation."), fontSize = 18.sp, color = Muted)
+        Text(vm.t("code_text", "The 4 digits on your invitation."), fontSize = 18.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         PinDots(vm.codeDigits.length)
         if (vm.codeMessage.isNotEmpty()) Text(vm.codeMessage, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold, fontSize = 16.sp)
         Keypad(vm::codeKey, vm::codeDelete, keyH = if (wide) 72 else 60)
@@ -277,7 +267,7 @@ private fun ClosedBody(vm: AppViewModel) {
         Spacer(Modifier.height(1.dp))
         Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Text(vm.t("closed_title", "Registration has closed."), fontSize = 42.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 46.sp)
-            Text(vm.t("closed_text", "Please ask at the desk if you need help."), fontSize = 20.sp, color = Muted)
+            Text(vm.t("closed_text", "Please ask at the desk if you need help."), fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Spacer(Modifier.height(1.dp))
     }
@@ -299,22 +289,37 @@ private fun FormBody(vm: AppViewModel) {
     }
     // new person: back to the top
     LaunchedEffect(vm.formVersion) { scroll.scrollTo(0) }
-    Column(Modifier.fillMaxSize()) {
-        Column(Modifier.weight(1f).verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Text(vm.t("form_title", "Your details"), fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
-            key(vm.formVersion) {
-                ev.fields.forEach { f ->
-                    if (vm.visible(f)) FieldView(vm, f, Modifier.onGloballyPositioned { tops[f.id] = it.positionInParent().y.toInt() })
+    RegistrationFormLayout(
+        scroll = scroll, message = vm.formMessage, submitting = vm.submitting,
+        submitLabel = if (vm.submitting) vm.t("wait_label", "Please wait…") else "Submit",
+        onCancel = { vm.cancelRegistration() }, onSubmit = { vm.submit() }
+    ) {
+        Text(vm.t("form_title", "Your details"), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
+        key(vm.formVersion) {
+            val fields = ev.fields.filter { vm.visible(it) }
+            var i = 0
+            while (i < fields.size) {
+                val f = fields[i]
+                val next = fields.getOrNull(i + 1)
+                val firstName = f.name.replace(" ", "").equals("firstname", true)
+                val lastName = next?.name?.replace(" ", "")?.let { it.equals("lastname", true) || it.equals("surname", true) } == true
+                if (firstName && lastName && next != null && !f.isLong && !next.isLong) {
+                    key(f.id, next.id) {
+                        Row(Modifier.fillMaxWidth().onGloballyPositioned { p ->
+                            tops[f.id] = p.positionInParent().y.toInt(); tops[next.id] = p.positionInParent().y.toInt()
+                        }, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                            FieldView(vm, f, Modifier.weight(1f))
+                            FieldView(vm, next, Modifier.weight(1f))
+                        }
+                    }
+                    i += 2
+                } else {
+                    key(f.id) { FieldView(vm, f, Modifier.onGloballyPositioned { tops[f.id] = it.positionInParent().y.toInt() }) }
+                    i++
                 }
             }
-            Spacer(Modifier.height(120.dp)) // room to scroll the last field above the keyboard
         }
-        if (vm.formMessage.isNotEmpty())
-            Text(vm.formMessage, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(vertical = 8.dp))
-        Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            if (vm.flag("show_back")) BigButton(vm.t("back_label", "Back"), { vm.backToWelcome() }, primary = false, enabled = !vm.submitting)
-            BigButton(if (vm.submitting) vm.t("wait_label", "Please wait…") else vm.t("submit_label", "Register"), { vm.submit() }, Modifier.weight(1f), enabled = !vm.submitting)
-        }
+        Spacer(Modifier.height(24.dp))
     }
     if (vm.showConsent) ConsentDialog(vm, ev)
 }
@@ -324,15 +329,15 @@ private fun ConsentDialog(vm: AppViewModel, ev: EventInfo) {
     AlertDialog(
         onDismissRequest = {},
         title = { Text("Before you register", fontWeight = FontWeight.ExtraBold) },
-        text = { Column(Modifier.verticalScroll(rememberScrollState())) { Text(ev.consentText.ifBlank { "I agree that my details may be used for this event." }) } },
-        confirmButton = { TextButton(onClick = { vm.agree() }) { Text("I agree", fontWeight = FontWeight.ExtraBold) } },
-        dismissButton = { TextButton(onClick = { vm.decline() }) { Text("No thanks") } }
+        text = { Column(Modifier.verticalScroll(rememberScrollState())) { Text(ev.consentText.ifBlank { "May the organizer send you email campaigns?" }); Spacer(Modifier.height(12.dp)); Text("Selecting No still completes your registration. You will receive your confirmation and e-ticket, but will not be included in email campaigns.") } },
+        confirmButton = { TextButton(onClick = { vm.agree() }) { Text("Yes — allow campaign emails", fontWeight = FontWeight.ExtraBold) } },
+        dismissButton = { TextButton(onClick = { vm.decline() }) { Text("No — continue without campaign emails") } }
     )
 }
 
 @Composable
 private fun FieldLabel(f: Field) {
-    Text(f.name + if (f.required) " *" else "", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    Text(f.name.uppercase(Locale.getDefault()) + if (f.required) " *" else "", fontSize = 12.sp, letterSpacing = 1.sp, fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
 @OptIn(ExperimentalLayoutApi::class)
@@ -340,7 +345,7 @@ private fun FieldLabel(f: Field) {
 private fun FieldView(vm: AppViewModel, f: Field, modifier: Modifier = Modifier) {
     if (f.unsupported) return
     if (f.isStatic) {
-        Text(f.name, fontSize = 16.sp, color = Muted, textAlign = if (f.type == "text_center") TextAlign.Center else if (f.type == "text_right") TextAlign.End else TextAlign.Start, modifier = modifier.fillMaxWidth())
+        Text(f.name, fontSize = 16.sp, color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = if (f.type == "text_center") TextAlign.Center else if (f.type == "text_right") TextAlign.End else TextAlign.Start, modifier = modifier.fillMaxWidth())
         return
     }
     val err = vm.errors[f.id]
@@ -393,7 +398,7 @@ private fun FieldView(vm: AppViewModel, f: Field, modifier: Modifier = Modifier)
                 }
                 val focus = LocalFocusManager.current
                 val keyboard = LocalSoftwareKeyboardController.current
-                OutlinedTextField(
+                TextField(
                     value = vm.values[f.id].orEmpty(), onValueChange = { vm.setValue(f.id, it) },
                     modifier = Modifier.fillMaxWidth().onFocusChanged { if (it.isFocused) keyboard?.show() },
                     placeholder = { if (f.placeholder.isNotBlank()) Text(f.placeholder) },
@@ -404,7 +409,8 @@ private fun FieldView(vm: AppViewModel, f: Field, modifier: Modifier = Modifier)
                         imeAction = if (f.isLong) ImeAction.Default else ImeAction.Next
                     ),
                     keyboardActions = KeyboardActions(onNext = { focus.moveFocus(FocusDirection.Down) }),
-                    isError = err != null, shape = RoundedCornerShape(16.dp),
+                    isError = err != null, shape = RoundedCornerShape(0.dp),
+                    colors = TextFieldDefaults.colors(focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent, disabledContainerColor = Color.Transparent, errorContainerColor = Color.Transparent),
                     textStyle = LocalTextStyleLarge()
                 )
             }
@@ -428,7 +434,7 @@ private fun ChoiceField(vm: AppViewModel, f: Field) {
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(cur.ifBlank { f.placeholder.ifBlank { "Choose" } }, fontSize = 19.sp, color = if (cur.isBlank()) Muted else MaterialTheme.colorScheme.onBackground)
-            Text("▾", fontSize = 20.sp, color = Muted)
+            Text("▾", fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         DropdownMenu(open, { open = false }) {
             f.options.forEach { o -> DropdownMenuItem(text = { Text(o, fontSize = 18.sp) }, onClick = { vm.setValue(f.id, o); open = false }) }
@@ -463,21 +469,21 @@ private fun OutcomeBody(vm: AppViewModel) {
             if (offline) Box(Modifier.size(64.dp).clip(CircleShape).background(Warn), contentAlignment = Alignment.Center) { Text("!", color = WarnInk, fontSize = 32.sp, fontWeight = FontWeight.ExtraBold) }
             else CheckBadge(64)
             Text(o.title, fontSize = 38.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 42.sp)
-            Text(o.message, fontSize = 20.sp, color = Muted)
+            Text(o.message, fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
             if (o.pin.isNotBlank() && vm.flag("show_pin")) {
                 Column(Modifier.clip(RoundedCornerShape(20.dp)).background(MaterialTheme.colorScheme.surfaceVariant).padding(horizontal = 24.dp, vertical = 16.dp)) {
-                    Text(vm.t("pin_label", "Your code"), color = Muted, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+                    Text(vm.t("pin_label", "Your code"), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
                     Text(o.pin, fontSize = 40.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 4.sp)
                 }
             }
             if (offline && vm.queue.isNotEmpty())
-                Text("${vm.queue.size} registration${if (vm.queue.size == 1) "" else "s"} waiting to send", fontWeight = FontWeight.SemiBold, color = Muted)
+                Text("${vm.queue.size} registration${if (vm.queue.size == 1) "" else "s"} waiting to send", fontWeight = FontWeight.SemiBold, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
             BigButton(vm.t("done_label", "Done"), { vm.resetAll() }, Modifier.weight(1f), height = 72)
             if (offline) BigButton("Send now", { vm.flushQueue() }, primary = false, height = 72)
         }
-        Text(vm.t("countdown_text", "The form clears for the next person in {seconds} seconds", "seconds" to vm.countdown.toString()), color = Muted, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
+        Text(vm.t("countdown_text", "The form clears for the next person in {seconds} seconds", "seconds" to vm.countdown.toString()), color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 15.sp, fontWeight = FontWeight.SemiBold,
             modifier = Modifier.fillMaxWidth().padding(top = 12.dp), textAlign = TextAlign.Center)
     }
 }
@@ -487,10 +493,10 @@ private fun OutcomeBody(vm: AppViewModel) {
 @Composable
 private fun SetupScreen(vm: AppViewModel) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(28.dp).widthIn(max = 640.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text("EazyTagg Register", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
-        Text("Set this tablet up once. Staff only.", color = Muted, fontSize = 17.sp)
-        OutlinedTextField(vm.serverInput, { vm.serverInput = it }, Modifier.fillMaxWidth(), label = { Text("Server address") },
-            placeholder = { Text("192.168.0.120/eazytagg_test") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
+        Text("PDynamics Registration", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
+        Text("Enter the server computer’s IP address and the event code. Connect this tablet to the same network.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 17.sp)
+        OutlinedTextField(vm.serverInput, { vm.serverInput = it }, Modifier.fillMaxWidth(), label = { Text("Server IP address") },
+            placeholder = { Text("192.168.0.39") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
         OutlinedTextField(vm.codeInput, { vm.codeInput = it }, Modifier.fillMaxWidth(), label = { Text("Event code") }, singleLine = true)
         if (vm.setupMessage.isNotEmpty()) Text(vm.setupMessage, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
         BigButton(if (vm.setupBusy) "Connecting…" else "Save and start", { vm.saveSetup() }, Modifier.fillMaxWidth(), enabled = !vm.setupBusy)
@@ -513,7 +519,7 @@ private fun SettingRow(title: String, sub: String, checked: Boolean, onChange: (
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
         Column(Modifier.weight(1f)) {
             Text(title, fontWeight = FontWeight.Bold, fontSize = 17.sp)
-            Text(sub, color = Muted, fontSize = 14.sp)
+            Text(sub, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
         }
         Switch(checked, onChange)
     }
@@ -530,15 +536,15 @@ private fun StaffScreen(vm: AppViewModel) {
         }
         HorizontalDivider()
         Text("Form from the system", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
-        Text(ev?.let { "${it.title.ifBlank { it.code }} · ${it.fields.size} fields" } ?: "Not loaded", color = Muted)
-        Text(if (vm.lastRefreshed > 0) "Last updated ${fmt.format(Date(vm.lastRefreshed))}" else "Never updated", color = Muted)
-        if (vm.refreshNote.isNotEmpty()) Text(vm.refreshNote, color = Muted, fontSize = 14.sp)
+        Text(ev?.let { "${it.title.ifBlank { it.code }} · ${it.fields.size} fields" } ?: "Not loaded", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        Text(if (vm.lastRefreshed > 0) "Last updated ${fmt.format(Date(vm.lastRefreshed))}" else "Never updated", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        if (vm.refreshNote.isNotEmpty()) Text(vm.refreshNote, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
         BigButton(if (vm.refreshing) "Updating…" else "Refresh now", { vm.refresh() }, enabled = !vm.refreshing, height = 56, radius = 28)
         ev?.let { e ->
             Text("Fields (name · type)", fontWeight = FontWeight.Bold, modifier = Modifier.padding(top = 8.dp))
             e.fields.forEach { f ->
                 Text("${f.name.take(60)} · ${f.type}${if (f.required) " · required" else ""}${if (f.isStatic) " · shown as text" else ""}${if (f.unsupported) " · not supported here" else ""}",
-                    color = Muted, fontSize = 14.sp)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
             }
         }
         HorizontalDivider(Modifier.padding(vertical = 6.dp))
@@ -550,7 +556,7 @@ private fun StaffScreen(vm: AppViewModel) {
         Slider(vm.resetSeconds.toFloat(), { vm.updateResetSeconds(it.toInt()) }, valueRange = 5f..30f)
         HorizontalDivider(Modifier.padding(vertical = 6.dp))
         Text("Waiting to send (${vm.queue.size})", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
-        if (vm.syncNote.isNotEmpty()) Text(vm.syncNote, color = Muted, fontSize = 14.sp)
+        if (vm.syncNote.isNotEmpty()) Text(vm.syncNote, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 14.sp)
         vm.queue.forEach { op ->
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
@@ -564,7 +570,7 @@ private fun StaffScreen(vm: AppViewModel) {
         if (vm.queue.any { !it.failed }) BigButton(if (vm.syncing) "Sending…" else "Send now", { vm.flushQueue() }, enabled = !vm.syncing, height = 52, radius = 26)
         HorizontalDivider(Modifier.padding(vertical = 6.dp))
         Text("Server and event", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
-        OutlinedTextField(vm.serverInput, { vm.serverInput = it }, Modifier.fillMaxWidth(), label = { Text("Server address") }, singleLine = true)
+        OutlinedTextField(vm.serverInput, { vm.serverInput = it }, Modifier.fillMaxWidth(), label = { Text("Server IP address") }, placeholder = { Text("192.168.0.39") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
         OutlinedTextField(vm.codeInput, { vm.codeInput = it }, Modifier.fillMaxWidth(), label = { Text("Event code") }, singleLine = true)
         if (vm.setupMessage.isNotEmpty()) Text(vm.setupMessage, color = MaterialTheme.colorScheme.error)
         BigButton(if (vm.setupBusy) "Connecting…" else "Save server settings", { vm.saveSetup() }, enabled = !vm.setupBusy, height = 52, radius = 26)

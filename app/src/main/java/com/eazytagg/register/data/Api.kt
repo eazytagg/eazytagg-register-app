@@ -9,7 +9,7 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
-/** Result of one call to the EazyTagg PHP API. */
+/** Result of one call to the PDynamics PHP API. */
 sealed class ApiResult {
     data class Reply(val status: String, val message: String, val json: JSONObject) : ApiResult()
     data class NoConnection(val reason: String) : ApiResult()
@@ -71,6 +71,20 @@ object Api {
 
     suspend fun getEvent(base: String, code: String) =
         call(base, "get.event.php", JSONObject().put("event_code", code))
+
+    /** Read-only discovery on the supplied IP; never submits or checks in a guest. */
+    suspend fun connectToEvent(ip: String, code: String, savedBase: String = ""): Pair<String, ApiResult> {
+        var last: ApiResult = ApiResult.NoConnection("The registration server could not be found on this IP address.")
+        for (base in ServerAddress.candidates(ip, savedBase)) {
+            val reply = getEvent(base, code)
+            if (reply is ApiResult.Reply) {
+                val validEvent = reply.status == "success" && reply.json.has("title") && reply.json.optJSONArray("data") != null
+                if (validEvent || reply.message.equals("Invalid event code", ignoreCase = true)) return base to reply
+            }
+            last = reply
+        }
+        return "" to last
+    }
 
     /** Registers a new attendee. The server also checks them in and prints their tag. */
     suspend fun submit(

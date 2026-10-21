@@ -12,5 +12,5 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "EazyTaggRegister"
+rootProject.name = "PDynamicsRegister"
 include(":app")
