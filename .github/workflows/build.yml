@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      HAS_SIGNING_KEY: ${{ secrets.PDYNAMICS_TEST_KEYSTORE_B64 != '' }}
     permissions:
       contents: write
     concurrency:
@@ -23,6 +25,7 @@ jobs:
         with:
           gradle-version: 8.10.2
       - name: Restore persistent test signing key
+        if: env.HAS_SIGNING_KEY == 'true'
         env:
           TEST_KEYSTORE: ${{ secrets.PDYNAMICS_TEST_KEYSTORE_B64 }}
         run: |
@@ -53,7 +56,7 @@ jobs:
           Path('build-info.json').write_text(json.dumps({'file':apk.name,'commit':os.environ['GITHUB_SHA'],'sha256':hashlib.sha256(apk.read_bytes()).hexdigest()}))
           PY
       - name: Publish test download
-        if: github.ref == 'refs/heads/main'
+        if: github.ref == 'refs/heads/main' && env.HAS_SIGNING_KEY == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
           APK_NAME: pdynamics-register-test.apk
@@ -61,7 +64,10 @@ jobs:
           gh release view test-latest >/dev/null 2>&1 || gh release create test-latest --target "$GITHUB_SHA" --prerelease --title "PDynamics Reg — latest test build" --notes "For internal testing. Not a Play Store release."
           gh api --method PATCH "repos/$GITHUB_REPOSITORY/git/refs/tags/test-latest" -f sha="$GITHUB_SHA" -F force=true >/dev/null
           gh release upload test-latest "$APK_NAME" build-info.json --clobber
+      - name: Keep existing signed download
+        if: env.HAS_SIGNING_KEY != 'true'
+        run: echo "::notice::Tests and build completed. The published, locally signed APK is kept. CI does not replace the download with a different signing identity."
       - uses: actions/upload-artifact@v4
         with:
-          name: pdynamics-register-test-apk
+          name: pdynamics-register-ci-validation-only
           path: app/build/outputs/apk/debug/*.apk
