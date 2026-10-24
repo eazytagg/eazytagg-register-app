@@ -44,12 +44,12 @@ internal fun RegistrationFormLayout(
 }
 
 /** The portrait header is explicitly bounded so it cannot consume the form's space. */
-@OptIn(ExperimentalLayoutApi::class)
 @Composable
 internal fun AdaptiveKioskLayout(
     form: Boolean,
     modifier: Modifier = Modifier,
     forceStack: Boolean = false,
+    keyboardOpen: Boolean = false,
     brand: @Composable (compact: Boolean) -> Unit,
     body: @Composable (wide: Boolean) -> Unit,
     footer: @Composable () -> Unit
@@ -58,7 +58,7 @@ internal fun AdaptiveKioskLayout(
         val viewportWidth = maxWidth
         val viewportHeight = maxHeight
         // With the keyboard open the form needs the full width, so the side panel folds into a thin top strip.
-        val keyboardUp = form && WindowInsets.isImeVisible
+        val keyboardUp = form && keyboardOpen
         val wide = !forceStack && !keyboardUp && KioskLayoutPolicy.sideBySide(viewportWidth.value, viewportHeight.value)
         if (wide) {
             val pad = if (maxWidth >= 1200.dp) 40.dp else 24.dp

@@ -90,9 +90,11 @@ private fun PoweredBy(vm: AppViewModel, onDark: Boolean = false) {
 
 // ============ layout shell: banner on the left (tablet) / on top (phone) ============
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Kiosk(vm: AppViewModel) {
     AdaptiveKioskLayout(
+        keyboardOpen = WindowInsets.isImeVisible,
         form = vm.screen == Screen.Form,
         forceStack = vm.t("layout", "split") == "stack",
         brand = { compact -> BrandPanel(vm, compact) },
