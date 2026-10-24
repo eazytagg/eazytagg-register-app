@@ -12,8 +12,8 @@ android {
         applicationId = "com.eazytagg.register"
         minSdk = 24
         targetSdk = 34
-        versionCode = 7
-        versionName = "0.3.3"
+        versionCode = 8
+        versionName = "0.3.4"
     }
 
     buildTypes {

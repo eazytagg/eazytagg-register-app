@@ -575,8 +575,9 @@ private fun SetupScreen(vm: AppViewModel) {
                     shape = RoundedCornerShape(14.dp),
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { vm.saveSetup() }))
-                if (vm.setupMessage.isNotEmpty()) Text(vm.setupMessage, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
-                BigButton(if (vm.setupBusy) "Connecting\u2026" else "Continue", { vm.saveSetup() }, Modifier.fillMaxWidth(), enabled = !vm.setupBusy)
+                if (vm.setupMessage.isNotEmpty()) Text(vm.setupMessage, color = if (vm.setupGood) Color(0xFF238E43) else MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
+                BigButton(if (vm.setupBusy) "Connecting\u2026" else "Continue", { vm.saveSetup() }, Modifier.fillMaxWidth(), enabled = !vm.setupBusy && !vm.testBusy)
+                BigButton(if (vm.testBusy) "Testing\u2026" else "Test connection", { vm.testConnection() }, Modifier.fillMaxWidth(), primary = false, enabled = !vm.setupBusy && !vm.testBusy, height = 56)
             }
         }
         if (wide) Row(Modifier.fillMaxSize()) {

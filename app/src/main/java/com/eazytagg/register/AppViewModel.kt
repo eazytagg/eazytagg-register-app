@@ -152,6 +152,33 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private fun clock(): String = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
 
     // ================= setup =================
+    var testBusy by mutableStateOf(false)
+        private set
+    var setupGood by mutableStateOf(false)
+        private set
+
+    /** Checks the server address only. Nothing is saved and nobody is registered. */
+    fun testConnection() {
+        if (testBusy || setupBusy) return
+        val ip = ServerAddress.ip(serverInput)
+        if (ip == null) { setupGood = false; setupMessage = "Enter only the server IP address, for example 192.168.0.39."; return }
+        viewModelScope.launch {
+            testBusy = true; setupMessage = ""; setupGood = false
+            val failures = mutableListOf<String>()
+            var found = ""
+            for (b in ServerAddress.candidates(ip, store.baseUrl)) {
+                when (val r = Api.ping(b)) {
+                    is ApiResult.Reply -> { found = b; break }
+                    is ApiResult.NoConnection -> failures += "$b  ->  ${r.reason}"
+                }
+            }
+            setupGood = found.isNotEmpty()
+            setupMessage = if (found.isNotEmpty()) "Connected. The server answered at $found"
+                else "Cannot reach the server. Tried:\n" + failures.joinToString("\n")
+            testBusy = false
+        }
+    }
+
     fun saveSetup() {
         if (setupBusy) return
         val ip = ServerAddress.ip(serverInput)
