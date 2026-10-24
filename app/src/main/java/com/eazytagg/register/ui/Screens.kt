@@ -312,10 +312,10 @@ private fun FormBody(vm: AppViewModel) {
         scroll = scroll, message = vm.formMessage, submitting = vm.submitting,
         submitLabel = if (vm.submitting) vm.t("wait_label", "Please wait…") else vm.t("submit_label", "Submit"),
         onCancel = { vm.cancelRegistration() }, onSubmit = { vm.submit() },
-        clearLabel = vm.t("clear_label", "").ifBlank { null },
+        clearLabel = if (vm.flag("show_clear")) vm.t("clear_label", "Clear") else null,
         onClear = { vm.clearFormFields() },
         clearColor = ev.ui["clear_color"]?.takeIf { it.isNotBlank() }?.let { parseAccent(it) },
-        submitColor = ev.ui["submit_color"]?.takeIf { it.isNotBlank() }?.let { parseAccent(it) },
+        submitColor = ev.ui["submit_color"]?.takeIf { it.isNotBlank() }?.let { parseAccent(it) } ?: Color(0xFF238E43),
         cancelLabel = vm.t("cancel_label", "Cancel")
     ) {
         Text(vm.t("form_title", "Your details"), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
