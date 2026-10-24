@@ -20,6 +20,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -96,6 +97,9 @@ private fun PoweredBy(vm: AppViewModel, onDark: Boolean = false) {
 private fun Kiosk(vm: AppViewModel) {
     AdaptiveKioskLayout(
         keyboardOpen = WindowInsets.isImeVisible,
+        brandFraction = (vm.uiInt("logo_area_width", 31).coerceIn(20, 60)) / 100f,
+        headerFraction = (if (vm.screen == Screen.Form) vm.uiInt("logo_area_height_form", 15).coerceIn(8, 35)
+                          else vm.uiInt("logo_area_height", 25).coerceIn(12, 45)) / 100f,
         form = vm.screen == Screen.Form,
         forceStack = vm.t("layout", "split") == "stack",
         brand = { compact -> BrandPanel(vm, compact) },
@@ -237,13 +241,13 @@ private fun AskDialog(vm: AppViewModel) {
 
 @Composable
 private fun WelcomeBody(vm: AppViewModel) {
-    Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.SpaceBetween) {
-        Spacer(Modifier.height(1.dp))
-        Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text(vm.t("welcome_title", "Welcome."), fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 52.sp)
-            Text(vm.t("welcome_text", "Register here to get your name tag."), fontSize = 20.sp, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        }
-        BigButton(vm.t("start_label", "Register"), { vm.start() }, Modifier.fillMaxWidth(), height = 76)
+    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterVertically)) {
+        Text(vm.t("welcome_title", "Welcome."), fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 52.sp, textAlign = TextAlign.Center)
+        Text(vm.t("welcome_text", "Register/Check in Here to Get Your Name Tag"), fontSize = 20.sp,
+            color = MaterialTheme.colorScheme.onSurfaceVariant, textAlign = TextAlign.Center)
+        Spacer(Modifier.height(4.dp))
+        BigButton(vm.t("start_label", "Register"), { vm.start() }, Modifier.widthIn(max = 520.dp).fillMaxWidth(), height = 76)
     }
 }
 
@@ -317,7 +321,7 @@ private fun FormBody(vm: AppViewModel) {
         onClear = { vm.clearFormFields() },
         clearColor = ev.ui["clear_color"]?.takeIf { it.isNotBlank() }?.let { parseAccent(it) },
         submitColor = ev.ui["submit_color"]?.takeIf { it.isNotBlank() }?.let { parseAccent(it) } ?: Color(0xFF238E43),
-        cancelLabel = vm.t("cancel_label", "Cancel")
+        cancelLabel = vm.t("cancel_label", "").ifBlank { null }
     ) {
         Text(vm.t("form_title", "Your details"), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
         key(vm.formVersion) {
@@ -518,29 +522,69 @@ private fun OutcomeBody(vm: AppViewModel) {
 
 // ============ setup / staff ============
 
+private val GlowDark = listOf(Color(0xFF0C4466), Color(0xFF0B0D14))
+private val GlowLight = listOf(Color(0xFFCDEAFA), Color(0xFFF4F6FB))
+
+/** The Popular Dynamics wordmark: its own colours on light screens, plain white on dark ones. */
+@Composable
+private fun BrandLogo(modifier: Modifier = Modifier) {
+    Image(painterResource(R.drawable.pdynamics_logo), "Popular Dynamics", modifier, contentScale = ContentScale.Fit,
+        colorFilter = if (LocalDark.current) androidx.compose.ui.graphics.ColorFilter.tint(Color.White) else null)
+}
+
 @Composable
 private fun SplashScreen() {
-    Box(Modifier.fillMaxSize().background(Color.White), contentAlignment = Alignment.Center) {
-        Image(painterResource(R.drawable.pdynamics_logo), "Popular Dynamics",
-            Modifier.fillMaxWidth(0.6f).widthIn(max = 520.dp), contentScale = ContentScale.Fit)
+    val dark = LocalDark.current
+    Column(Modifier.fillMaxSize().background(Brush.verticalGradient(if (dark) GlowDark else GlowLight)),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        BrandLogo(Modifier.fillMaxWidth(0.62f).widthIn(max = 560.dp))
+        Spacer(Modifier.height(20.dp))
+        Text("REGISTRATION", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 13.sp, letterSpacing = 5.sp, fontWeight = FontWeight.Medium)
+        Spacer(Modifier.height(14.dp))
+        LinearProgressIndicator(Modifier.width(120.dp).clip(CircleShape), color = DefaultAccent, trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f))
     }
 }
 
 @Composable
 private fun SetupScreen(vm: AppViewModel) {
-    Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), contentAlignment = Alignment.Center) {
-        Column(Modifier.widthIn(max = 560.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
-            Image(painterResource(R.drawable.pdynamics_logo), "Popular Dynamics", Modifier.width(220.dp).height(72.dp), contentScale = ContentScale.Fit)
-            Text("Connect this tablet", fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
-            Text("Enter the server computer’s IP address and the event code. Connect this tablet to the same network.",
-                color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp, textAlign = TextAlign.Center)
-            OutlinedTextField(vm.serverInput, { vm.serverInput = it }, Modifier.fillMaxWidth(), label = { Text("Server IP address") },
-                placeholder = { Text("192.168.0.39") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next))
-            OutlinedTextField(vm.codeInput, { vm.codeInput = it }, Modifier.fillMaxWidth(), label = { Text("Event code") }, singleLine = true,
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, imeAction = ImeAction.Done),
-                keyboardActions = KeyboardActions(onDone = { vm.saveSetup() }))
-            if (vm.setupMessage.isNotEmpty()) Text(vm.setupMessage, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
-            BigButton(if (vm.setupBusy) "Connecting…" else "Continue", { vm.saveSetup() }, Modifier.fillMaxWidth(), enabled = !vm.setupBusy)
+    val dark = LocalDark.current
+    BoxWithConstraints(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+        val wide = KioskLayoutPolicy.sideBySide(maxWidth.value, maxHeight.value)
+        val brandPanel: @Composable (Modifier) -> Unit = { m ->
+            Column(m.background(Brush.verticalGradient(if (dark) GlowDark else GlowLight)).padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+                BrandLogo(Modifier.fillMaxWidth(if (wide) 0.8f else 0.55f).widthIn(max = 360.dp))
+                if (wide) {
+                    Spacer(Modifier.height(18.dp))
+                    Text("Connecting people.\nPowering possibilities.", textAlign = TextAlign.Center, fontSize = 20.sp,
+                        color = MaterialTheme.colorScheme.onBackground)
+                }
+            }
+        }
+        val form: @Composable (Modifier) -> Unit = { m ->
+            Column(m.verticalScroll(rememberScrollState()).padding(horizontal = if (wide) 48.dp else 24.dp, vertical = 16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp, Alignment.CenterVertically)) {
+                Text("FIRST TIME SETUP", color = DefaultAccent, fontSize = 12.sp, letterSpacing = 2.sp, fontWeight = FontWeight.Bold)
+                Text("Connect this tablet", fontSize = if (wide) 34.sp else 28.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 38.sp)
+                Text("Enter the server computer\u2019s IP address and the event code. Both devices need to be on the same network.",
+                    color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp)
+                OutlinedTextField(vm.serverInput, { vm.serverInput = it }, Modifier.fillMaxWidth(), label = { Text("Server IP address") },
+                    placeholder = { Text("192.168.0.39") }, singleLine = true, shape = RoundedCornerShape(14.dp),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next))
+                OutlinedTextField(vm.codeInput, { vm.codeInput = it }, Modifier.fillMaxWidth(), label = { Text("Event code") }, singleLine = true,
+                    shape = RoundedCornerShape(14.dp),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, imeAction = ImeAction.Done),
+                    keyboardActions = KeyboardActions(onDone = { vm.saveSetup() }))
+                if (vm.setupMessage.isNotEmpty()) Text(vm.setupMessage, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
+                BigButton(if (vm.setupBusy) "Connecting\u2026" else "Continue", { vm.saveSetup() }, Modifier.fillMaxWidth(), enabled = !vm.setupBusy)
+            }
+        }
+        if (wide) Row(Modifier.fillMaxSize()) {
+            brandPanel(Modifier.weight(0.31f).fillMaxHeight())
+            form(Modifier.weight(0.69f).fillMaxHeight())
+        } else Column(Modifier.fillMaxSize().imePadding()) {
+            brandPanel(Modifier.fillMaxWidth().weight(0.22f))
+            form(Modifier.fillMaxWidth().weight(0.78f))
         }
     }
 }

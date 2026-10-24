@@ -44,7 +44,7 @@ class KioskLayoutTest {
                             }
                         },
                         body = {
-                            RegistrationFormLayout(rememberScrollState(), "", false, "Submit", {}, {}) {
+                            RegistrationFormLayout(rememberScrollState(), "", false, "Submit", {}, {}, clearLabel = "Clear") {
                                 Text("Your details")
                                 repeat(20) { i ->
                                     TextField("", {}, label = { Text("Field ${i + 1}") }, modifier = Modifier.fillMaxWidth().testTag("field-${i + 1}"))
@@ -58,11 +58,11 @@ class KioskLayoutTest {
 
     private fun actionsAndBrandStayVisible() {
         compose.onNodeWithText("Submit").assertIsDisplayed()
-        compose.onNodeWithText("Cancel").assertIsDisplayed()
+        compose.onNodeWithText("Clear").assertIsDisplayed()
         compose.onNodeWithContentDescription("Popular Dynamics").assertIsDisplayed()
         compose.onNodeWithTag("field-20").performScrollTo().assertIsDisplayed()
         compose.onNodeWithText("Submit").assertIsDisplayed()
-        compose.onNodeWithText("Cancel").assertIsDisplayed()
+        compose.onNodeWithText("Clear").assertIsDisplayed()
         val image = compose.onNodeWithContentDescription("Popular Dynamics").fetchSemanticsNode().boundsInRoot
         assertTrue("The full wordmark should be wider than the icon", image.width > image.height * 2f)
     }

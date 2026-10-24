@@ -29,14 +29,14 @@ internal fun RegistrationFormLayout(
     onClear: () -> Unit = {},
     clearColor: Color? = null,
     submitColor: Color? = null,
-    cancelLabel: String = "Cancel",
+    cancelLabel: String? = null,
     content: @Composable ColumnScope.() -> Unit
 ) {
     Column(Modifier.fillMaxSize()) {
         Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(scroll), verticalArrangement = Arrangement.spacedBy(16.dp), content = content)
         if (message.isNotEmpty()) Text(message, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(vertical = 8.dp))
         Row(Modifier.fillMaxWidth().padding(top = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            BigButton(cancelLabel, onCancel, Modifier.weight(1f), primary = false, enabled = !submitting, height = 56)
+            if (cancelLabel != null) BigButton(cancelLabel, onCancel, Modifier.weight(1f), primary = false, enabled = !submitting, height = 56)
             if (clearLabel != null) BigButton(clearLabel, onClear, Modifier.weight(1f), enabled = !submitting, height = 56, tint = clearColor ?: Color(0xFFD64545))
             BigButton(submitLabel, onSubmit, Modifier.weight(1f), enabled = !submitting, height = 56, tint = submitColor)
         }
@@ -50,6 +50,8 @@ internal fun AdaptiveKioskLayout(
     modifier: Modifier = Modifier,
     forceStack: Boolean = false,
     keyboardOpen: Boolean = false,
+    brandFraction: Float = 0.36f,
+    headerFraction: Float? = null,
     brand: @Composable (compact: Boolean) -> Unit,
     body: @Composable (wide: Boolean) -> Unit,
     footer: @Composable () -> Unit
@@ -63,13 +65,17 @@ internal fun AdaptiveKioskLayout(
         if (wide) {
             val pad = if (maxWidth >= 1200.dp) 40.dp else 24.dp
             Row(Modifier.fillMaxSize()) {
-                Box(Modifier.weight(0.36f).fillMaxHeight()) { brand(false) }
-                Box(Modifier.weight(0.64f).fillMaxHeight().padding(horizontal = pad, vertical = 24.dp)) { body(true) }
+                Box(Modifier.weight(brandFraction).fillMaxHeight()) { brand(false) }
+                Box(Modifier.weight(1f - brandFraction).fillMaxHeight().padding(horizontal = pad, vertical = 24.dp)) { body(true) }
             }
         } else {
             val short = maxHeight < 500.dp
             Column(Modifier.fillMaxSize()) {
-                val head = if (keyboardUp) KioskLayoutPolicy.headerHeight(viewportHeight.value, form).coerceAtMost(56f) else KioskLayoutPolicy.headerHeight(viewportHeight.value, form)
+                val head = when {
+                    keyboardUp -> KioskLayoutPolicy.headerHeight(viewportHeight.value, form).coerceAtMost(56f)
+                    headerFraction != null -> (viewportHeight.value * headerFraction).coerceIn(64f, if (form) 150f else 240f)
+                    else -> KioskLayoutPolicy.headerHeight(viewportHeight.value, form)
+                }
                 Box(Modifier.fillMaxWidth().height(head.dp)) { brand(true) }
                 Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = if (viewportWidth < 400.dp) 16.dp else 24.dp, vertical = if (short) 8.dp else 18.dp)) { body(false) }
                 if (!keyboardUp) Box(Modifier.fillMaxWidth().padding(bottom = 4.dp), contentAlignment = Alignment.Center) { footer() }
