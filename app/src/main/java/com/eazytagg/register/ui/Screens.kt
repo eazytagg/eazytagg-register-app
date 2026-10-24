@@ -573,7 +573,7 @@ private fun SetupScreen(vm: AppViewModel) {
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next))
                 OutlinedTextField(vm.codeInput, { vm.codeInput = it }, Modifier.fillMaxWidth(), label = { Text("Event code") }, singleLine = true,
                     shape = RoundedCornerShape(14.dp),
-                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, imeAction = ImeAction.Done),
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, imeAction = ImeAction.Done),
                     keyboardActions = KeyboardActions(onDone = { vm.saveSetup() }))
                 if (vm.setupMessage.isNotEmpty()) Text(vm.setupMessage, color = if (vm.setupGood) Color(0xFF238E43) else MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
                 BigButton(if (vm.setupBusy) "Connecting\u2026" else "Continue", { vm.saveSetup() }, Modifier.fillMaxWidth(), enabled = !vm.setupBusy && !vm.testBusy)
