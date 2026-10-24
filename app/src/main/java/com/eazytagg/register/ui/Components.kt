@@ -41,13 +41,13 @@ val LocalButtonStyle = compositionLocalOf { ButtonStyle() }
 @Composable
 fun BigButton(
     text: String, onClick: () -> Unit, modifier: Modifier = Modifier,
-    primary: Boolean = true, enabled: Boolean = true, height: Int = 68, radius: Int = -1
+    primary: Boolean = true, enabled: Boolean = true, height: Int = 68, radius: Int = -1, tint: Color? = null
 ) {
     val st = LocalButtonStyle.current
     val shape = RoundedCornerShape((if (radius >= 0) radius else (st.radius ?: 34)).dp)
-    val accent = st.color ?: LocalAccent.current
+    val accent = tint ?: st.color ?: LocalAccent.current
     val h = if (height >= 68 && st.height != null) st.height else height
-    val fg = if (primary) (st.text ?: MaterialTheme.colorScheme.onPrimary) else MaterialTheme.colorScheme.onBackground
+    val fg = if (primary) (if (tint != null) Color.White else st.text ?: MaterialTheme.colorScheme.onPrimary) else MaterialTheme.colorScheme.onBackground
     BoxWithConstraints(
         modifier
             .heightIn(min = h.dp)
