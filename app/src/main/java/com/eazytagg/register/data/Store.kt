@@ -40,7 +40,7 @@ class Store(private val ctx: Context) {
         set(v) = prefs.edit().putBoolean("test", v).apply()
 
     var darkTheme: Boolean
-        get() = prefs.getBoolean("dark", false)
+        get() = prefs.getBoolean("dark", true)
         set(v) = prefs.edit().putBoolean("dark", v).apply()
 
     /** Seconds the "registered" screen shows before the form clears for the next person. */

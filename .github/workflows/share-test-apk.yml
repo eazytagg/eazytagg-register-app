@@ -26,7 +26,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          TAG="register-0.3.5-spare-tablet-test"
-          cp app/build/outputs/apk/debug/app-debug.apk pdynamics-register-0.3.5-test.apk
+          TAG="register-0.3.6-spare-tablet-test"
+          cp app/build/outputs/apk/debug/app-debug.apk pdynamics-register-0.3.6-test.apk
           gh release delete "$TAG" --yes --cleanup-tag >/dev/null 2>&1 || true
-          gh release create "$TAG" pdynamics-register-0.3.5-test.apk --target "$GITHUB_SHA" --prerelease --title "Register 0.3.5 - spare tablet test (not update-signed)" --notes "Test build for a spare tablet. Not signed with the office key, so it cannot update an installed office build."
+          gh release create "$TAG" pdynamics-register-0.3.6-test.apk --target "$GITHUB_SHA" --prerelease --title "Register 0.3.6 - spare tablet test (not update-signed)" --notes "Test build for a spare tablet. Not signed with the office key, so it cannot update an installed office build."
