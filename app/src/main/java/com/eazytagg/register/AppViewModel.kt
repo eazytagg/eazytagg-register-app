@@ -349,6 +349,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     fun setMulti(id: String, v: List<String>) { multi[id] = v; errors.remove(id); formMessage = "" }
     fun setSignature(id: String, b64: String) { signatures[id] = b64; errors.remove(id) }
 
+    /** Clear button: empties every field but stays on the form. */
+    fun clearFormFields() { if (!submitting) clearForm() }
+
     private fun clearForm() {
         values.clear(); multi.clear(); signatures.clear(); errors.clear()
         formMessage = ""; showConsent = false; submitting = false

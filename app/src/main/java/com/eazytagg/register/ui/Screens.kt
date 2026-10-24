@@ -90,10 +90,13 @@ private fun PoweredBy(vm: AppViewModel, onDark: Boolean = false) {
 
 // ============ layout shell: banner on the left (tablet) / on top (phone) ============
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun Kiosk(vm: AppViewModel) {
     AdaptiveKioskLayout(
+        keyboardOpen = WindowInsets.isImeVisible,
         form = vm.screen == Screen.Form,
+        forceStack = vm.t("layout", "split") == "stack",
         brand = { compact -> BrandPanel(vm, compact) },
         body = { wide -> KioskBody(vm, wide) },
         footer = { PoweredBy(vm) }
@@ -127,7 +130,23 @@ private fun BrandPanel(vm: AppViewModel, compact: Boolean) {
         if (bg.isNotEmpty()) AsyncImage(bg, null, Modifier.matchParentSize(), contentScale = ContentScale.Crop)
         if (bg.isNotEmpty()) Box(Modifier.matchParentSize().background(Color(0x66000000)))
         val textColor = if (bg.isNotEmpty()) Color.White else onAccent
-        if (compact) {
+        val logoOnly = vm.flag("show_logo", false) && logo.isNotEmpty()
+        if (logoOnly) {
+            // Logo-only banner. "cover" fills the whole area, "contain" shows the whole logo boxed in the middle.
+            val fit = ev.ui["logo_fit"] ?: "auto"
+            var ratio by remember(logo) { mutableStateOf(0f) }
+            val boxRatio = maxWidth.value / maxHeight.value
+            val cover = fit == "cover" || (fit == "auto" && ratio > 0f && kotlin.math.abs(ratio / boxRatio - 1f) <= 0.25f)
+            Box(Modifier.matchParentSize().background(if (ev.ui["logo_tile"] == "dark") Color(0xFF111111) else Color.White), contentAlignment = Alignment.Center) {
+                AsyncImage(logo, "Event logo",
+                    if (cover) Modifier.matchParentSize() else Modifier.fillMaxSize().padding(if (compact) 6.dp else 28.dp),
+                    contentScale = if (cover) ContentScale.Crop else ContentScale.Fit,
+                    onSuccess = { st -> val d = st.result.drawable; if (d.intrinsicHeight > 0) ratio = d.intrinsicWidth.toFloat() / d.intrinsicHeight })
+            }
+            if (!vm.online) Box(Modifier.align(Alignment.TopEnd).padding(8.dp)) { Chip("Offline", Warn, WarnInk) }
+            // no visible "Powered by" so the logo fills the area; an invisible hotspot keeps the 3-tap staff entry
+            Box(Modifier.align(Alignment.BottomCenter).size(72.dp, 40.dp).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { vm.logoTap() })
+        } else if (compact) {
             val artwork = if (ev.ui["artwork_mode"] == "logo") logo.ifBlank { bg } else bg.ifBlank { logo }
             if (artwork.isNotEmpty()) {
                 AsyncImage(artwork, "Event artwork", Modifier.matchParentSize(),
@@ -291,8 +310,13 @@ private fun FormBody(vm: AppViewModel) {
     LaunchedEffect(vm.formVersion) { scroll.scrollTo(0) }
     RegistrationFormLayout(
         scroll = scroll, message = vm.formMessage, submitting = vm.submitting,
-        submitLabel = if (vm.submitting) vm.t("wait_label", "Please wait…") else "Submit",
-        onCancel = { vm.cancelRegistration() }, onSubmit = { vm.submit() }
+        submitLabel = if (vm.submitting) vm.t("wait_label", "Please wait…") else vm.t("submit_label", "Submit"),
+        onCancel = { vm.cancelRegistration() }, onSubmit = { vm.submit() },
+        clearLabel = vm.t("clear_label", "").ifBlank { null },
+        onClear = { vm.clearFormFields() },
+        clearColor = ev.ui["clear_color"]?.takeIf { it.isNotBlank() }?.let { parseAccent(it) },
+        submitColor = ev.ui["submit_color"]?.takeIf { it.isNotBlank() }?.let { parseAccent(it) },
+        cancelLabel = vm.t("cancel_label", "Cancel")
     ) {
         Text(vm.t("form_title", "Your details"), fontSize = 28.sp, fontWeight = FontWeight.ExtraBold)
         key(vm.formVersion) {
@@ -328,10 +352,10 @@ private fun FormBody(vm: AppViewModel) {
 private fun ConsentDialog(vm: AppViewModel, ev: EventInfo) {
     AlertDialog(
         onDismissRequest = {},
-        title = { Text("Before you register", fontWeight = FontWeight.ExtraBold) },
+        title = { Text(vm.t("consent_title", "Before you register"), fontWeight = FontWeight.ExtraBold) },
         text = { Column(Modifier.verticalScroll(rememberScrollState())) { Text(ev.consentText.ifBlank { "May the organizer send you email campaigns?" }); Spacer(Modifier.height(12.dp)); Text("Selecting No still completes your registration. You will receive your confirmation and e-ticket, but will not be included in email campaigns.") } },
-        confirmButton = { TextButton(onClick = { vm.agree() }) { Text("Yes — allow campaign emails", fontWeight = FontWeight.ExtraBold) } },
-        dismissButton = { TextButton(onClick = { vm.decline() }) { Text("No — continue without campaign emails") } }
+        confirmButton = { TextButton(onClick = { vm.agree() }) { Text(vm.t("agree_label", "Yes — allow campaign emails"), fontWeight = FontWeight.ExtraBold) } },
+        dismissButton = { TextButton(onClick = { vm.decline() }) { Text(vm.t("decline_label", "No — continue without campaign emails")) } }
     )
 }
 
@@ -391,7 +415,10 @@ private fun FieldView(vm: AppViewModel, f: Field, modifier: Modifier = Modifier)
                     looksPhone -> KeyboardType.Phone
                     else -> KeyboardType.Text
                 }
+                val capSetting = vm.event?.ui?.get("autocap")
                 val caps = when {
+                    capSetting == "none" -> KeyboardCapitalization.None
+                    capSetting == "sentences" && !(f.type == "email" || kb == KeyboardType.Number || kb == KeyboardType.Phone) -> KeyboardCapitalization.Sentences
                     f.type == "email" || kb == KeyboardType.Number || kb == KeyboardType.Phone -> KeyboardCapitalization.None
                     f.isLong -> KeyboardCapitalization.Sentences
                     else -> KeyboardCapitalization.Words   // names, organisations, titles: every word starts with a capital
