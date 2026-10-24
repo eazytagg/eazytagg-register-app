@@ -1,0 +1,32 @@
+name: Share test APK (manual)
+
+# Manual only. Builds the app and attaches the APK to its own prerelease so it has a direct .apk link.
+# It never touches the test-latest release. The APK is NOT signed with the office key,
+# so it cannot update an installed office build; uninstall first or use a spare tablet.
+on:
+  workflow_dispatch:
+
+jobs:
+  share:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.10.2
+      - name: Build APK
+        run: gradle :app:assembleDebug --no-daemon --console=plain --max-workers=2
+      - name: Publish prerelease
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG="register-0.3.0-spare-tablet-test"
+          cp app/build/outputs/apk/debug/app-debug.apk pdynamics-register-0.3.0-test.apk
+          gh release delete "$TAG" --yes --cleanup-tag >/dev/null 2>&1 || true
+          gh release create "$TAG" pdynamics-register-0.3.0-test.apk --target "$GITHUB_SHA" --prerelease --title "Register 0.3.0 - spare tablet test (not update-signed)" --notes "Test build for a spare tablet. Not signed with the office key, so it cannot update an installed office build."
