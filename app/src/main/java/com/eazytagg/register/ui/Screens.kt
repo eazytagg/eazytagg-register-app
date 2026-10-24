@@ -72,6 +72,7 @@ fun Root(vm: AppViewModel) {
       CompositionLocalProvider(LocalButtonStyle provides style) {
         Surface(Modifier.fillMaxSize().imePadding(), color = MaterialTheme.colorScheme.background) {
             when (vm.screen) {
+                Screen.Splash -> SplashScreen()
                 Screen.Setup -> SetupScreen(vm)
                 Screen.StaffGate -> GateScreen(vm)
                 Screen.Staff -> StaffScreen(vm)
@@ -518,15 +519,29 @@ private fun OutcomeBody(vm: AppViewModel) {
 // ============ setup / staff ============
 
 @Composable
+private fun SplashScreen() {
+    Box(Modifier.fillMaxSize().background(Color.White), contentAlignment = Alignment.Center) {
+        Image(painterResource(R.drawable.pdynamics_logo), "Popular Dynamics",
+            Modifier.fillMaxWidth(0.6f).widthIn(max = 520.dp), contentScale = ContentScale.Fit)
+    }
+}
+
+@Composable
 private fun SetupScreen(vm: AppViewModel) {
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(28.dp).widthIn(max = 640.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text("PDynamics Registration", fontSize = 34.sp, fontWeight = FontWeight.ExtraBold)
-        Text("Enter the server computer’s IP address and the event code. Connect this tablet to the same network.", color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 17.sp)
-        OutlinedTextField(vm.serverInput, { vm.serverInput = it }, Modifier.fillMaxWidth(), label = { Text("Server IP address") },
-            placeholder = { Text("192.168.0.39") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-        OutlinedTextField(vm.codeInput, { vm.codeInput = it }, Modifier.fillMaxWidth(), label = { Text("Event code") }, singleLine = true)
-        if (vm.setupMessage.isNotEmpty()) Text(vm.setupMessage, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
-        BigButton(if (vm.setupBusy) "Connecting…" else "Save and start", { vm.saveSetup() }, Modifier.fillMaxWidth(), enabled = !vm.setupBusy)
+    Box(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(24.dp), contentAlignment = Alignment.Center) {
+        Column(Modifier.widthIn(max = 560.dp).fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp)) {
+            Image(painterResource(R.drawable.pdynamics_logo), "Popular Dynamics", Modifier.width(220.dp).height(72.dp), contentScale = ContentScale.Fit)
+            Text("Connect this tablet", fontSize = 32.sp, fontWeight = FontWeight.ExtraBold, textAlign = TextAlign.Center)
+            Text("Enter the server computer’s IP address and the event code. Connect this tablet to the same network.",
+                color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 16.sp, textAlign = TextAlign.Center)
+            OutlinedTextField(vm.serverInput, { vm.serverInput = it }, Modifier.fillMaxWidth(), label = { Text("Server IP address") },
+                placeholder = { Text("192.168.0.39") }, singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal, imeAction = ImeAction.Next))
+            OutlinedTextField(vm.codeInput, { vm.codeInput = it }, Modifier.fillMaxWidth(), label = { Text("Event code") }, singleLine = true,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Characters, imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { vm.saveSetup() }))
+            if (vm.setupMessage.isNotEmpty()) Text(vm.setupMessage, color = MaterialTheme.colorScheme.error, fontWeight = FontWeight.SemiBold)
+            BigButton(if (vm.setupBusy) "Connecting…" else "Continue", { vm.saveSetup() }, Modifier.fillMaxWidth(), enabled = !vm.setupBusy)
+        }
     }
 }
 

@@ -19,7 +19,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
-enum class Screen { Setup, Welcome, Choose, Scan, Code, Form, Outcome, Closed, StaffGate, Staff }
+enum class Screen { Splash, Setup, Welcome, Choose, Scan, Code, Form, Outcome, Closed, StaffGate, Staff }
 
 class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val store = Store(app)
@@ -28,7 +28,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     val staffPinSet: Boolean get() = store.staffPin.isNotBlank()
 
     // ---- navigation ----
-    var screen by mutableStateOf(Screen.Setup)
+    var screen by mutableStateOf(Screen.Splash)
         private set
     private var before = Screen.Welcome
 
@@ -107,8 +107,14 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         store.staffPin = "" // the staff PIN was removed: Staff opens the settings directly
         queue.addAll(store.loadQueue())
         event = EventInfo.fromJson(store.eventJson)
-        screen = if (store.baseUrl.isBlank() || store.eventCode.isBlank() || event == null) Screen.Setup else startScreen()
-        if (screen != Screen.Setup) refresh()
+        fun configured() = !(store.baseUrl.isBlank() || store.eventCode.isBlank() || event == null)
+        screen = Screen.Splash
+        if (configured()) refresh()
+        // logo splash first, then the login (server IP + event code) the first time, or Welcome once set up
+        viewModelScope.launch {
+            delay(1800)
+            if (screen == Screen.Splash) screen = if (configured()) startScreen() else Screen.Setup
+        }
 
         viewModelScope.launch {
             while (true) {
